@@ -64,7 +64,7 @@ def plot_stimuli(trail_result, plot_title="Trail Results", save_path=None):
     
     # Plot the expected rewards
     ax[num_stimuli + 1].set_title("Reward Expectation/Prediction")
-    ax[num_stimuli + 1].plot(reward_predictions, label="Recolra-Wagner Prediction")
+    ax[num_stimuli + 1].plot(reward_predictions, label="Rescolra-Wagner Prediction")
     if "idealized_expected_rewards" in trail_result:
         ax[num_stimuli + 1].plot(trail_result["idealized_expected_rewards"], color='g', label='Idealized Expected Rewards')
     ax[num_stimuli + 1].axvline(x=trail_result["pre_train_end"], color="r", linestyle="--")
@@ -162,9 +162,7 @@ def run_secondary_conditioning(num_trials, num_stimuli, model_under_test):
 
 run_secondary_conditioning(num_trials, num_stimuli, 
                                 learning_rule.rescolra_wagner_create(num_stimuli))
-#%%
-# Explaining Away: 
-# s_1+s_2 -> r | s_1 -> r | s_1 -> r , s_2 -> '.'
+#%% Explaining Away:  s_1+s_2 -> r | s_1 -> r | s_1 -> r , s_2 -> '.'
 num_trials = 100
 num_stimuli =  2
 
@@ -181,6 +179,7 @@ def run_explaining_away(num_trials, num_stimuli, model_under_test):
 run_explaining_away(num_trials, num_stimuli, 
                         learning_rule.rescolra_wagner_create(num_stimuli))
 
+#%%
 def run():
     scenarios_fn = [run_blocking_trail, 
                         run_inhibitory_conditioning, 
