@@ -1,9 +1,8 @@
 #%%
 import numpy as np
-
-
+import learning_rule
+#%%
 """
-
 Design an appropriate array to describe the belief of the animal
 about the current state of the environment on each trial, right
 before receiving the CS. 
@@ -11,7 +10,6 @@ before receiving the CS.
 The animal first encounters 50 conditioning trials, followed by 
 50 extinction trials the next day, and, after a 30-day delay, 
 encounters the CS again for a single trial.
-
 """
 #%%
 conditioning_trials = 50
@@ -19,15 +17,17 @@ extinction_trials = 50
 delay = 30
 num_states = 2
 
-
 #%%
 # animal creates a state representation for stimulus such that
 # it appends a new set of states to the to keep track of newly 
 # encountered stimuli state
 # CS -> (stimulus) -> Shock
 # B -> 
+num_stimuli = 2
+cs_us_rel = learning_rule.rescolra_wagner_create(num_stimuli)
+us_only = learning_rule.rescolra_wagner_create(num_states) 
 
-state_array = np.array([[], [],[]])
+state_array = [ cs_us_rel, us_only] 
 
 # CS - Conditioned stimulus - Tone
 # US - Unconditioned stimulus - Shock
@@ -75,7 +75,16 @@ Weight the update magnitude by the belief in the current state
 and assume the belief remains constant throughout the trial.
 """
 
-
+def update_weight_by_belief(model, stimulus, reward, reward_prediction, belief):
+    """
+    update_weight_by_belief - Update the weights of the model using the 
+    rescorla-wagner learning rule. 
+    stimulus: single stimulus vector 
+    """
+    delta = reward - reward_prediction 
+    update = model["epsilon"] * delta * stimulus * belief
+    model["weights"] += update
+    return model
 
 """
 Maintain a learned association strength between CS and US for
@@ -84,5 +93,17 @@ Rescorla-Wagner rule. Weight the update magnitude by the belief
 in the current state and assume the belief remains constant 
 throughout the trial.
 """
+def update_states_by_belief(state_array, stimulus, reward, reward_prediction, belief_vector):
+    """
+    update_states - 
+    """
+    for state_idx, state in enumerate(state_array):
+        update_weight_by_belief(state, 
+                                stimulus, 
+                                reward, 
+                                reward_prediction, 
+                                belief_vector[state_idx])
+    return state_array
+
 
 # %%
