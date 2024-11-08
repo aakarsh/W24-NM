@@ -22,7 +22,7 @@ importlib.reload(secondary_conditioning)
 importlib.reload(explaining_away)
 importlib.reload(inhibitory_conditioning_trail)
 
-IMAGE_ROOT="/Users/aakarsh/src/TUE-WINTER-2024/W24-NEURO-MODELING/hw-2/images"
+IMAGE_ROOT="/Users/aakarsh/src/TUE-WINTER-2024/W24-NEURO-MODELING/hws/hw-2/images"
 
 #%%
 #%%
@@ -144,7 +144,8 @@ def run_overshadowing(num_trials, num_stimuli, model_under_test):
 
 run_overshadowing(num_trials, num_stimuli, 
                     learning_rule.rescolra_wagner_create(num_stimuli))
-#%% Secondary Conditioning: s_1 -> r | s_2 -> s_1 | s_2 -> r  (No Reward?)
+#%% Secondary Conditioning: 
+# s_1 -> r | s_2 -> s_1 | s_2 -> r  
 num_trials = 100
 num_stimuli =  2
 
@@ -162,7 +163,8 @@ def run_secondary_conditioning(num_trials, num_stimuli, model_under_test):
 run_secondary_conditioning(num_trials, num_stimuli, 
                                 learning_rule.rescolra_wagner_create(num_stimuli))
 #%%
-# Explaining Away: s_1+s_2 -> r | s_1 -> r | s_1 -> r , s_2 -> '.'
+# Explaining Away: 
+# s_1+s_2 -> r | s_1 -> r | s_1 -> r , s_2 -> '.'
 num_trials = 100
 num_stimuli =  2
 
@@ -170,18 +172,26 @@ def run_explaining_away(num_trials, num_stimuli, model_under_test):
     pre_train_period = (0, 0.50)
     train_period     = (0.50, 1.0)
     train_result = \
-        trail_runner.run_trail(num_trials, num_stimuli, 
-                               model_under_test, 
+        trail_runner.run_trail(num_trials, num_stimuli, model_under_test, 
                                explaining_away.setup_stimuli, 
                                         pre_train_period=pre_train_period, 
                                         train_period=train_period)
-    plot_stimuli(train_result) 
-
+    plot_stimuli(train_result, save_path=f"{IMAGE_ROOT}/explaining_away.png") 
 
 run_explaining_away(num_trials, num_stimuli, 
                         learning_rule.rescolra_wagner_create(num_stimuli))
 
+def run():
+    scenarios_fn = [run_blocking_trail, 
+                        run_inhibitory_conditioning, 
+                        run_overshadowing, 
+                        run_secondary_conditioning, 
+                        run_explaining_away]
+    for scenario_fn in scenarios_fn:
+        scenario_fn(num_trials, num_stimuli, 
+                        learning_rule.rescolra_wagner_create(num_stimuli))
+ 
 #%%
 if __name__ == "__main__":
-    pass
-#%%
+    #%%
+    run()
