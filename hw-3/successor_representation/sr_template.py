@@ -148,6 +148,36 @@ def compute_transition_matrix(maze):
     # coordinates onto a single number for this).
 
     # Create a matrix over all state-pairs.
+    num_states = maze.size 
+    transitions = np.zeros((num_states, num_states)) 
+    state_transition_counts = np.zeros(num_states)
+
+    for i in range(maze.shape[0]): 
+        for j in range(maze.shape[1]): 
+            s = (i, j)
+            s_idx = position_idx(i, j, maze) 
+            for s_next in reachable_moves(maze, s): 
+                s_n_idx = position_idx(s_next[0], s_next[1], maze)
+                state_transition_counts[s_idx] += 1
+                transitions[s_idx, s_n_idx] += 1
+    # Normalize transitions
+    transitions = transitions / state_transition_counts[:, None]
+    transitions = np.nan_to_num(transitions)
+    
+    assert np.allclose(transitions.sum(axis=1), 1), "Rows of the transition matrix must sum to 1."
+    assert np.all(transitions >= 0), "Transition matrix cannot have negative probabilities."
+
+    return transitions 
+
+#%%
+def compute_transition_matrix_emperical(maze):
+    # For a given maze, compute the transition 
+    # matrix from any state to any other state under 
+    # a random walk policy.  (You will need to 
+    # think of a good way to map any 2D grid 
+    # coordinates onto a single number for this).
+
+    # Create a matrix over all state-pairs.
     #
     num_states = maze.size * maze.size  
     # np.zeros(TODO..) 
@@ -198,7 +228,7 @@ SR matrix into a vector).
 2. Non-invertible matrix.
 3. Singular matrix:- Bonus
 """
-def compute_sr(transitions, i, j, gamma=0.98):
+def compute_sr(transitions, i, j, gamma=0.98, shape=(9, 13)):
     # Given a transition matrix and a specific state 
     # (i, j), 
     # compute the successor representation of that state with 
@@ -206,24 +236,33 @@ def compute_sr(transitions, i, j, gamma=0.98):
 
     # initialize things (better to represent the current 
     # discounted occupancy as a vector here)
-    current_discounted_occupancy = np.zeros(TODO...)
+    num_states = shape[0] * shape[1]
+    current_discounted_occupancy = np.zeros(num_states)
+    current_discounted_occupancy[position_idx(i, j, maze)] = 1
+    
     total = current_discounted_occupancy.copy()
-    TODO...
+    #TODO...
 
     # iterate for a number of steps
-    for _ in range(340):
-        TODO...
-
-    # return the successor representation, maybe reshape your 
+    convergence_error = 1e-6
+    previous_total = total.copy()
+    for i in range(340):
+        total += gamma * (transitions @ total)
+        convergence_error = np.linalg.norm(total - previous_total) 
+        if i % 50 == 0: 
+            print(f"Convergence Error: {convergence_error}")
+        previous_total = total.copy()
+    # return the successor representation, 
+    # maybe reshape your 
     # vector into the maze shape now.
-    return total.reshape(TODO...)
+    return total.reshape(shape)
 
 #%%
 transitions = compute_transition_matrix(maze)
 #%%
 # compute state representation for start state
 i, j = start
-sr = compute_sr(transitions, i, j, 0.98)
+sr = compute_sr(transitions, i, j, 0.98, shape=maze.shape)
 
 # plot state representation
 plot_maze(maze)
@@ -237,4 +276,39 @@ plt.show()
 ############################################
 
 # You're on your own now
-# %%
+#%%
+def compute_sr_bonus(transitions, i, j, gamma=0.98, shape=(9, 13)):
+    # Given a transition matrix and a specific state 
+    # (i, j), 
+    # compute the successor representation of that state with 
+    # discount factor gamma
+
+    # initialize things (better to represent the current 
+    # discounted occupancy as a vector here)
+    num_states = shape[0] * shape[1]
+    current_discounted_occupancy = np.zeros(num_states)
+    current_discounted_occupancy[position_idx(i, j, maze)] = 1
+    
+    total = current_discounted_occupancy.copy()
+    I = np.eye(num_states)
+    transitions = np.linalg.inv(I - gamma * transitions) # LU ?
+    total = transitions @ total
+    return total.reshape(shape)
+   
+i, j = start
+print(f"Computing SR Bonus: {i}, {j}")
+sr_bonus = compute_sr_bonus(transitions, i, j, 
+                            0.98, shape=maze.shape) 
+plot_maze(maze)
+plt.imshow(sr_bonus, cmap='hot')
+# plt.savefig("transition_iterate")
+plt.show()
+
+i, j = (start[0]-2, start[1])
+print(f"Computing SR Bonus: {i}, {j}")
+sr_bonus = compute_sr_bonus(transitions, i, j, 
+                            0.98, shape=maze.shape) 
+plot_maze(maze)
+plt.imshow(sr_bonus, cmap='hot')
+# plt.savefig("transition_iterate")
+plt.show()
