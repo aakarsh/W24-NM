@@ -242,10 +242,13 @@ def compute_sr(transitions, i, j, gamma=0.98, shape=(9, 13)):
 
 #%%
 empirical_transitions = compute_transition_matrix_empirical(maze)
-transitions = compute_transition_matrix(maze) 
 plt.imshow(empirical_transitions)
 plt.show()
-plt.imshow(transitions)
+#%%
+transitions = compute_transition_matrix(maze) 
+#%%
+plt.imshow(transitions, cmap='hot')
+plt.savefig("transition_matrix.png")
 plt.show()
 #compute_transition_matrix(maze)
 #%%
@@ -256,7 +259,7 @@ sr = compute_sr(transitions, i, j, 0.98, shape=maze.shape)
 # plot state representation
 plot_maze(maze)
 plt.imshow(sr, cmap='hot')
-# plt.savefig("transition_iterate")
+plt.savefig("transition_iterate")
 plt.show()
 
 
