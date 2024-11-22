@@ -78,11 +78,12 @@ def make_value_state(n = num_time_steps):
     """."""
     return np.zeros(n)
 
+#%
 def delta(r, v, t):
     """
-        \delta(t) = r(t) + v(t + 1) - v(t)
+        \delta(t) = r + v(t + 1) - v(t)
     """
-    return r[t] + v[t+1] - v[t] if t < len(v) - 1 else r[t]
+    return r + v[t+1] - v[t] if t < len(v) - 1 else r
 
 def update_weights(w, u, delta, t, epsilon=0.1):
     """
@@ -92,7 +93,8 @@ def update_weights(w, u, delta, t, epsilon=0.1):
         w[tau] = w[tau] + epsilon * delta * u[t - tau]
     return w
 
-def run_trial(model, learning_rate=0.1):
+#%%
+def run_trial(model, learning_rate=0.1, reward_keep_probability=1.0):
     """
     Run a single trial.
     """
@@ -100,21 +102,25 @@ def run_trial(model, learning_rate=0.1):
    
     deltas = np.zeros(len(u)) 
     for t in range(len(u)): # time-step trail 
-        d = delta(r, v, t)
+        reward = r[t] 
+        if reward > 0  and reward_keep_probability < 1:
+            reward = r[t] if np.random.rand() < reward_keep_probability else 0
+        d = delta(reward, v, t)
         w = update_weights(w, u, d, t, epsilon=learning_rate)
         deltas[t] = d
         # v(t) = \sum_{\tau=0}^{t} w(\tau)  u(t - \tau)
         v[t] = np.dot(w[0:t+1], u[t::-1])
     return v, w, deltas
 
-def train_model(model, num_trials=100, learning_rate=0.1):
+#%%
+def train_model(model, num_trials=100, learning_rate=0.1, reward_keep_probability=1.0):
     """
     Run multiple trials.
     """
     model = SortedDict(model)
     prediction_errors = [] 
     for _ in range(num_trials): # number of trials
-        v, w, deltas = run_trial(model, learning_rate=learning_rate)
+        v, w, deltas = run_trial(model, learning_rate=learning_rate, reward_keep_probability=reward_keep_probability)
         model = update_model(model, v, w, deltas)
         prediction_errors.append(deltas)
     return model, np.array(prediction_errors)
@@ -395,5 +401,24 @@ for condition in ["SINGLE_REWARD", "MULTIPLE_REWARDS"]:
 
 #%%
 ## Stochastic Rewards (4h)
-# 1. Randomly provide rewards with low noise
-# 2. Randomly provide rewards with high noise
+## Vary the presence of reward based on the level of stochasticity required.  
+def experiment_stochastic_rewards(selected_condition, num_trials=2000, learning_rate=0.5):
+    model = initialize_model()
+    reward_keep_probability =  0.1 if selected_condition == "HIGH_STOCHASTIC_REWARDS" else 0.9
+   
+    pre_train_model, pre_deltas = pre_train_behavior(model, learning_rate=learning_rate)
+    trained_model, train_deltas = train_model(model, num_trials=num_trials, 
+                                              learning_rate=learning_rate, 
+                                              reward_keep_probability=reward_keep_probability)
+    post_train_model, post_train_deltas = post_train_behavior(trained_model, num_trials=num_trials, learning_rate=learning_rate)
+
+    save_path = os.path.join(IMAGE_PATH, f"experiment_stochastic_rewards_{selected_condition}.png")
+
+    plot_model_behavior(pre_train_model, pre_deltas,
+                        trained_model, train_deltas, 
+                        post_train_model, post_train_deltas, 
+                        save_path=save_path)
+#%%
+for condition in ["HIGH_STOCHASTIC_REWARDS", "LOW_STOCHASTIC_REWARDS"]:
+    experiment_stochastic_rewards(condition)
+# %%
