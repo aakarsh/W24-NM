@@ -54,6 +54,16 @@ def make_reward(n = num_time_steps):
     return r
 
 #%%
+def make_multiple_rewards(n = num_time_steps, num_rewards=2):
+    """."""
+    bump_idx = 120 
+    reward_distance = 50
+    r = np.zeros(n)
+    for i in range(num_rewards):
+        r = add_bump(r, bump_idx + reward_distance * i, bump_width=2)
+    return r
+
+#%%
 def make_weights(n = num_time_steps):
     """."""
     return np.zeros(n)
@@ -102,6 +112,7 @@ def train_model(model, num_trials=100, learning_rate=0.1):
         model = update_model(model, v, w, deltas)
         prediction_errors.append(deltas)
     return model, np.array(prediction_errors)
+
 #%%
 def pre_train_behavior(model, learning_rate=0.1):
     """
@@ -115,7 +126,7 @@ def pre_train_behavior(model, learning_rate=0.1):
     return model, np.array(prediction_errors)
 
 #%%
-def post_train_behavior(model, num_trials=100, learning_rate=0.1):
+def post_train_behavior(model, learning_rate=0.1):
     """
     Post-train the behavior of the model.
     """
@@ -155,10 +166,24 @@ def initialize_model(num_time_steps=250):
              "weights": w,
              "dv": dv
     })
-
+#%%
+def model_from_template(model, overrides = {}):
+    """
+    Create a new model from a template.
+    """
+    return SortedDict({
+        "stimulus": np.copy(model["stimulus"]) if "stimulus" not in overrides else overrides["stimulus"],
+        "rewards": np.copy(model["rewards"]) if "rewards" not in overrides else overrides["rewards"],
+        "values": np.copy(model["values"]) if "values" not in overrides else overrides["values"],
+        "weights": np.copy(model["weights"]) if "weights" not in overrides else overrides["weights"],
+        "dv": np.copy(model["dv"] if "dv" not in overrides else overrides["dv"])
+    })
+    
 #%%
 # Generate example data
-def plot_prediction_error(model, deltas, ax=None, save_path=None):
+def plot_prediction_error(model, deltas, ax=None, save_path=None, delta_min=0, delta_max=2):
+    #if ax: ax.set_zlim(delta_min, delta_max)  # Ensure consistent z-axis limits
+
     u, r, v, w, dv = \
         model["stimulus"], \
         model["rewards"], \
@@ -187,7 +212,7 @@ def plot_prediction_error(model, deltas, ax=None, save_path=None):
  
     surf = ax.plot_surface(time, trials, deltas, 
                            cmap='gray', edgecolor='k', 
-                           rstride=70, cstride=70, alpha=0.3)
+                           rstride=45, cstride=45, alpha=0.2)
 
     ax.set_xlabel('Time (t)')
     ax.set_ylabel('Trials')
@@ -208,6 +233,8 @@ def plot_model_behavior(pre_train_model, pre_train_deltas,
 
     gs = GridSpec(n_vars + 1, 2, figure=fig,  height_ratios=[10] + [1] * n_vars)  # Define a grid with 2 rows and 2 columns
     top_graph_ax = fig.add_subplot(gs[0, :], projection='3d')
+    
+
     plot_prediction_error(training_model, training_deltas, ax=top_graph_ax)    
 
     num_time_steps = pre_train_model["stimulus"].shape[0]
@@ -228,15 +255,7 @@ def plot_model_behavior(pre_train_model, pre_train_deltas,
         "Δv":np.append(np.array([0]), post_train_model["dv"]),
         "δ": post_train_deltas.flatten()
     }
-
-    # Create the figure for Panel B
-    # n_vars = len(variables_before)
-    # fig, axes = plt.subplots(n_vars, 2, figsize=(14, 8), sharex=True, sharey=True)
-
-    #axes = [fig.add_subplot(gs[1:, i]) for i in range(2)]  # Allocate two columns for "before" and "after"
-    #ax_before = fig.add_subplot(gs[1, 0])  # Left column
-    #ax_after = fig.add_subplot(gs[1, 1])   # Right column
-    
+   
     axes_before = []
     axes_after = []
 
@@ -248,8 +267,6 @@ def plot_model_behavior(pre_train_model, pre_train_deltas,
         
     # Plot "before" and "after" for each variable
     for i, (var, data_before) in enumerate(variables_before.items()):
-        # "Before" plots
-        #ax_before = axes[i, 0]
         ax_before =axes_before[i] 
 
         ax_before.plot(t, data_before, color='black')
@@ -259,33 +276,31 @@ def plot_model_behavior(pre_train_model, pre_train_deltas,
         ax_before.set_ylabel(var, rotation=0, labelpad=15)
 
         # "After" plots
-        #ax_after = axes[i, 1]
         ax_after = axes_after[i]
         ax_after.plot(t, variables_after[var], color='black')
         ax_after.axvline(100, color="gray", linestyle="--", linewidth=0.8)  # Key event marker
         if i == 0:
             ax_after.set_title("After")
 
-    #for ax in axes: ax.legend()
     # Set common labels and layout
     fig.text(0.5, 0.04, 't (time)', ha='center')
     plt.savefig(save_path) if save_path else None
     plt.show()
     
-
-#%%
-model = initialize_model()
-#%%
-pre_train_model, pre_train_deltas =\
+if False:
+    #%%
+    model = initialize_model()
+    #%%
+    pre_train_model, pre_train_deltas =\
     pre_train_behavior(model, learning_rate=0.9)
-#%%
-trained_model, train_deltas = \
+    #%%
+    trained_model, train_deltas = \
     train_model(model, num_trials=2000, learning_rate=0.9)
-#%%
-post_train_model, post_train_deltas = \
-    post_train_behavior(trained_model, num_trials=2000, learning_rate=0.9)
-#%%
-plot_model_behavior(pre_train_model, pre_train_deltas, 
+    #%%
+    post_train_model, post_train_deltas = \
+    post_train_behavior(trained_model, learning_rate=0.9)
+    #%%
+    plot_model_behavior(pre_train_model, pre_train_deltas, 
                     trained_model, train_deltas,
                     post_train_model, post_train_deltas)
 #%%
@@ -301,25 +316,18 @@ plot_model_behavior(pre_train_model, pre_train_deltas,
 ## Reward Timing  (1h)
 # 1. Give reward close to stimulus
 # 2. Give reward far from stimulus
-def experiment_reward_timing(stimulus_distance=20):
-    model = initialize_model()
-    model["rewards"] = add_bump(model["rewards"], 200 + stimulus_distance, bump_width=2)
-    pre_train_model, pre_deltas = pre_train_behavior(model, learning_rate=0.9)
-    trained_model, train_deltas = train_model(model, num_trials=2000, learning_rate=0.9)
-    post_train_model, post_train_deltas = post_train_behavior(trained_model, num_trials=2000, learning_rate=0.9)
-    plot_model_behavior(pre_train_model, pre_deltas, post_train_model, post_train_deltas)
-    plot_prediction_error(model, train_deltas)
-    
+   
 #%%
 ## Learning Rate (1h)
 # 1. High Learning Rate
 # 2. Low Learning Rate
-def experiment_learning_rate(selected_condition, high_lr=0.9, low_lr=0.05):
+def experiment_learning_rate(selected_condition, num_trials=2000, high_lr=0.5, low_lr=0.05):
     learning_rate = high_lr if "HIGH_LR" == selected_condition else low_lr 
     model = initialize_model()
     pre_train_model, pre_deltas = pre_train_behavior(model, learning_rate=learning_rate)
-    trained_model, train_deltas = train_model(model, num_trials=2000, learning_rate=learning_rate)
-    post_train_model, post_train_deltas = post_train_behavior(trained_model, num_trials=2000, learning_rate=learning_rate)
+    trained_model, train_deltas = train_model(model, num_trials=num_trials, learning_rate=learning_rate)
+    post_train_model, post_train_deltas = post_train_behavior(trained_model, num_trials=num_trials, learning_rate=learning_rate)
+
     save_path = os.path.join(IMAGE_PATH, f"experiment_learning_rate_{selected_condition}.png")
 
     plot_model_behavior(pre_train_model, pre_deltas,
@@ -331,8 +339,31 @@ for condition in ["HIGH_LR", "LOW_LR"]:
     experiment_learning_rate(condition) 
 #%%
 ## Multiple Rewards (3h)
-# 1. Provide two rewards
-# 2. Provide three rewards 
+# 1. Provide two rewards.
+# 2. Provide three rewards.
+def experiment_multiple_rewards(selected_condition, num_trials=2000, learning_rate=0.5, num_rewards=2):
+    model = initialize_model()
+    if selected_condition == "SINGLE_REWARD":
+        model = model_from_template(model, overrides={"rewards": make_reward()})
+    elif selected_condition == "MULTIPLE_REWARDS":
+        model_from_template(model, overrides={"rewards": make_multiple_rewards(num_rewards=num_rewards)})
+    else:
+        raise ValueError("Invalid condition") 
+    
+    pre_train_model, pre_deltas = pre_train_behavior(model, learning_rate=learning_rate)
+    trained_model, train_deltas = train_model(model, num_trials=num_trials, learning_rate=learning_rate)
+    post_train_model, post_train_deltas = post_train_behavior(trained_model, num_trials=num_trials, learning_rate=learning_rate)
+
+    save_path = os.path.join(IMAGE_PATH, f"experiment_multiple_rewards_{selected_condition}.png")
+
+    plot_model_behavior(pre_train_model, pre_deltas,
+                        trained_model, train_deltas, 
+                        post_train_model, post_train_deltas, 
+                        save_path=save_path)
+
+for condition in ["SINGLE_REWARD", "MULTIPLE_REWARDS"]:
+    experiment_multiple_rewards(condition) 
+ 
 
 #%%
 ## Stochastic Rewards (4h)
