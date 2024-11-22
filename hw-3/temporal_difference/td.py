@@ -234,7 +234,7 @@ def initialize_model(num_time_steps=250):
 
 #%%
 # Generate example data
-def plot_prediction_error(model, deltas, trials, time, delta, dummy_plot=True):
+def plot_prediction_error(model, deltas):
     u, r, v, w, dv = \
         model["stimulus"], \
         model["rewards"], \
@@ -244,11 +244,11 @@ def plot_prediction_error(model, deltas, trials, time, delta, dummy_plot=True):
     # delta : 100(num_trials) x 250 (num_time_steps)
     num_trials, num_time_steps = deltas.shape
 
-    # Generate grid
-    time = np.linspace(0,num_time_steps, num_time_steps)  # Match time steps
-    trials = np.linspace(0, num_trials, num_trials)  # Match number of trials
+    time = np.linspace(0,num_time_steps, num_time_steps)  
+    trials = np.linspace(0, num_trials, num_trials)  
 
-    trials, time = np.meshgrid(trials, time)  # Meshgrid for consistent dimensions
+    # Mesh Grid for consistent dimensions
+    trials, time = np.meshgrid(trials, time) 
     
     assert deltas.shape == trials.T.shape == time.T.shape 
   
@@ -262,14 +262,11 @@ def plot_prediction_error(model, deltas, trials, time, delta, dummy_plot=True):
     surf = ax.plot_surface(time, trials, deltas, 
                            cmap='gray', edgecolor='k', 
                            rstride=70, cstride=70, alpha=0.3)
-
     # Add color bar to show the mapping of colors to z-values
-    #fig.colorbar(surf, ax=ax, shrink=0.5, aspect=10, label='δ(t)')
-
     ax.set_xlabel('Time (t)')
     ax.set_ylabel('Trials')
     ax.set_zlabel('δ(t)')
-    
+     
     ax.view_init(elev=15, azim=-100)  
     plt.show()
 
@@ -306,11 +303,11 @@ model, deltas = train_model(model, num_trials=2000,
 #%%
 plot_final_state(model)
 #%%
-plot_prediction_error(model, deltas, 100, 100, 100, dummy_plot=False)    
+plot_prediction_error(model, deltas)    
 #%%
-## Experiment with following parameters. Plot and briefly describe 
-## your observations for each
-##
+## Experiment with following parameters. 
+## Plot and briefly describe your observations 
+## for each.
 
 #%%
 ## Reward Timing 
