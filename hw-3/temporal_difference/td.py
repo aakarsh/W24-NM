@@ -9,114 +9,6 @@ from matplotlib import cm
 
 from sortedcontainers import SortedDict
 #%%
-"""
-- rewards must be a bump
-- if you know the states
-- you only need to multiply your reward function with your future visitation of the states.
-- successor representation it always goes right, we now came about 
-the successor representation fo $s_1$ and policy is always go to like this. 
-- the animal does this thinga bunch of times. 
-- Then what my successor representation is going to look like. 
-- We start ins $s_1$ and i am here now. 
-- if i am here and i will visit state 1   
-- how often will i visit state 2. 
-- at least once as well. 
-- two you can reach from 3 and 1
-- it is not necessarily the maximum 
-- we are talking about the discounted future visitation of the states.
-- some valeu close to 1. 
-- We will visit state 2, we will count it to 0.98 offset. 
-- What will happen for state3. 
-- What will be the height of this. around 0.96 \gamma^2 
-- We will keep declining hwo many states 
-- how often will we visit state 6 0 times.
-- successor representation is very policy dependent. 
-- This is going to determine how it 
-- The expected sum of future discounted states. 
-- we will add a gamma^2 to state3 but then wi will visit again gamma^3 
-- wo sit will be some
--  so keep adding thims up when we visit up.
-- so rest is going to look all the same with another tow gammas because 
-- we visited it a bit later  
-- This is what sr does - how often we will visit 
-
-- How to learn this ? 
-- In TD you comapred current with rewards you boserve, and compute the td between them. 
-- for the sr what you do is you do it in same way. 
-- and things become easier, because in TD we need to keep track of time, 
-- but sr has allthe ftuure kind of collapesed into one. 
-
-- The way to update is to do a trajectory, keep count of which state and when. 
-- then a vector of when you visited them , 
-- compute the prediction error and 
-- its intutive to update this. 
-- you do need to collect whole sequence of visitations. 
-- i go up to the maze , need to collect th whole trajectory then 
-- you can update the SR. 
-- talk a bit when you have tried it. 
-- So state occupancy has to do with reward ??
-- We have all the future state visitations collapse 
-- into representation.
-
-- We can combine our future state occupancy with our rewards. 
-
-- we have T maze and we go randomly this way or that way. 
-- They will be a bit same and we might go left or right. 
-- so we say there will be reward in state 9. 
-- compute the dot product of future state occupancy with your .... 
-   
-
-
-Temporal Difference Learning:
-
-    t: time step t \in {0, 1, 2, ..., T}
-    u(t): \in \mathbb{R}^d stimulus at time t.
-    v(t): \in \mathbb{R}^d prediction at time t.
-    r(t): \in \mathbb{R}^d reward at time t.
-    
-    v(t) is interpreted as total expected reward from time t  
-    to the end of the episode T. Of course the animal 
-    does not know when the episode ends. 
-   
-   v(t)  = \sum_{\tau=0}^{T - t} r(t + \tau)
-   
-   or equivalently informally:
-   v(t) = r(t) + r(t + 1) + r(t + 2) + ... + r(T)
-   
-   where T is the end of the episode.
-   
-   The animal is assumed to average over multiple trials 
-   and it is denoted as:
-   
-   v(t) = \langle \sum_{\tau=0}^{T - t} r(t + \tau) \rangle
-   
-   The generalized approximation  of v(t) is:
-   
-   v(t)= \sum_{\tau=0}^{t} w(\tau)  u(t - \tau)
-   
-  Modified delta rule:
-    w(\tau)  = w(\tau) + \epson \delta(t) u(t - \tau) 
-    
- where:
-    \delta(t)  = \sum_{\tau} r( t + \tau ) - v(t)
-
-    computed-rewards - predicted-rewards
-
-We create a recusive fomulation usign future rewards
-\sum_{\tau=0}^{T - t} r(t + \tau) = r(t) + \sum_{\tau=0}^{T - t - 1} r(t + 1 + \tau)
-
-
-But it is assumed that v(t) provides a good approximation of the future rewards.
-That is 
-
-\sum_{\tau=0}^{T - t} r(t + \tau) \approx  r(t) + v(t + 1)
-
-This approximation is used to compute the temporal difference error:
-
-\delta(t) = r(t) + v(t + 1) - v(t)
-and 
-    w(\tau)  = w(\tau) + \epson \delta(t) u(t - \tau)
-"""
 #%%
 # We attempt to replicate the figure. 
 # z-axis - \delta(t) that is the prediction error.
@@ -133,10 +25,10 @@ def make_stimulus(n=num_time_steps):
     u[100] = 1
     return u
 #%%
-def add_bump(r, idx, bump_width=2):
+def add_bump(r, idx, bump_width=3,max_reward=.5, min_reward=0.10):
     """."""
-    decrements = np.linspace(1, 0.25, bump_width)
-    increments = np.linspace(0.25, 1, bump_width)
+    decrements = np.linspace(max_reward, min_reward, bump_width)
+    increments = np.linspace(min_reward, max_reward, bump_width)
     for i, d in enumerate(increments):
         r[idx - bump_width + i] = d
         
@@ -202,15 +94,36 @@ def train_model(model, num_trials=100, learning_rate=0.1):
     print(f"timestapm:deltas[0].shape: {deltas.shape}")
     return model, np.array(prediction_errors)
 
-def update_model(model, v, w, deltas):
+def pre_train_behavior(model, learning_rate=0.1):
+    """
+    Pre-train behavior of the model. 
+    """
+    prediction_errors = []
+    v, w, deltas = run_trial(model, learning_rate=learning_rate)
+    model = update_model(model, v, w, deltas, update_weights=False)
+    prediction_errors.append(deltas)
+    return model, np.array(prediction_errors) 
+
+def post_train_behavior(model, num_trials=100, learning_rate=0.1):
+    """
+    Post-train the behavior of the model.
+    """
+    prediction_errors = []
+    v, w, deltas = run_trial(model, learning_rate=learning_rate)
+    model = update_model(model, v, w, deltas, update_weights=False)
+    prediction_errors.append(deltas)
+    return model, np.array(prediction_errors)
+
+def update_model(model, v, w, deltas, update_weights=False):
     """
     Update the model with the new values.
     """
     model = SortedDict(model)
     model["values"] = v
-    model["weights"] = w
     model["dv"] = np.diff(v)
     model["deltas"] = deltas 
+    if update_weights:
+        model["weights"] = w
     return model
 
 def initialize_model(num_time_steps=250):
@@ -221,7 +134,6 @@ def initialize_model(num_time_steps=250):
     r = make_reward(n=num_time_steps)       # Trial property
     v = make_value_state(n=num_time_steps)  # Model property
     w = make_weights(n=num_time_steps)      # Model property
-
     dv = np.zeros(num_time_steps)           # Model property
 
     return SortedDict({ 
@@ -254,7 +166,7 @@ def plot_prediction_error(model, deltas):
   
     deltas = deltas.T  
 
-    fig = plt.figure(figsize=(8, 6))
+    fig = plt.figure(figsize=(11, 9))
     ax = fig.add_subplot(111, projection='3d')
 
     ax.scatter(0, 0, 0, color='black', s=10, label='O')
@@ -267,7 +179,7 @@ def plot_prediction_error(model, deltas):
     ax.set_ylabel('Trials')
     ax.set_zlabel('δ(t)')
      
-    ax.view_init(elev=15, azim=-100)  
+    ax.view_init(elev=15, azim=-110)  
     plt.show()
 
 
@@ -317,5 +229,56 @@ plot_prediction_error(model, deltas)
 #%%
 ## Stochastic Rewards
 #%% 
+
+#%%
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Example data generation
+t = np.linspace(0, 250, 250)  # Time points
+
+# Variables for "before" and "after"
+variables_before = {
+    "u": np.exp(-((t - 100)**2) / (2 * 5**2)),
+    "r": np.sin(t / 50),
+    "v": np.zeros_like(t),
+    "Δv": np.gradient(np.zeros_like(t), t),
+    "δ": np.exp(-((t - 100)**2) / (2 * 10**2))
+}
+
+variables_after = {
+    "u": np.exp(-((t - 100)**2) / (2 * 5**2)),
+    "r": np.sin(t / 50),
+    "v": np.heaviside(t - 100, 0.5),
+    "Δv": np.gradient(np.heaviside(t - 100, 0.5), t),
+    "δ": np.exp(-((t - 100)**2) / (2 * 10**2))
+}
+
+# Create the figure for Panel B
+n_vars = len(variables_before)
+fig, axes = plt.subplots(n_vars, 2, figsize=(10, 8), sharex=True, sharey=True)
+
+# Plot "before" and "after" for each variable
+for i, (var, data_before) in enumerate(variables_before.items()):
+    # "Before" plots
+    ax_before = axes[i, 0]
+    ax_before.plot(t, data_before, color='black')
+    ax_before.axvline(100, color="gray", linestyle="--", linewidth=0.8)  # Key event marker
+    if i == 0:
+        ax_before.set_title("Before")
+    ax_before.set_ylabel(var, rotation=0, labelpad=15)
+
+    # "After" plots
+    ax_after = axes[i, 1]
+    ax_after.plot(t, variables_after[var], color='black')
+    ax_after.axvline(100, color="gray", linestyle="--", linewidth=0.8)  # Key event marker
+    if i == 0:
+        ax_after.set_title("After")
+
+# Set common labels and layout
+fig.text(0.5, 0.04, 't (time)', ha='center')
+fig.text(0.04, 0.5, 'Variables', va='center', rotation='vertical')
+plt.tight_layout()
+plt.show()
 
 # %%
