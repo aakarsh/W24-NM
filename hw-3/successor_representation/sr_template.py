@@ -296,4 +296,4 @@ plot_maze(maze)
 plt.imshow(sr_bonus, cmap='hot')
 plt.savefig("sr_bonus_opposite_wall.png")
 plt.show()
-# %%
+#%%
