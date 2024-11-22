@@ -170,7 +170,7 @@ def compute_transition_matrix(maze):
     return transitions 
 
 #%%
-def compute_transition_matrix_emperical(maze):
+def compute_transition_matrix_empirical(maze):
     # For a given maze, compute the transition 
     # matrix from any state to any other state under 
     # a random walk policy.  (You will need to 
@@ -180,7 +180,6 @@ def compute_transition_matrix_emperical(maze):
     # Create a matrix over all state-pairs.
     #
     num_states = maze.size * maze.size  
-    # np.zeros(TODO..) 
     transitions = np.zeros((num_states, num_states)) 
     state_visit_counts = np.zeros(num_states)
     num_iterations = 10000
@@ -195,18 +194,13 @@ def compute_transition_matrix_emperical(maze):
             i,j = s
             s_idx = position_idx(i, j, maze) 
             s_n_idx = position_idx(s_next[0], s_next[1], maze)
-            print(f"State: {s_idx} Next State: {s_n_idx}")
             state_visit_counts[s_idx] += 1
             transitions[s_idx, s_n_idx] += 1
 
-    # TODO ...
     # Normalize transitions if neccessary.
-    # TODO ...
     transitions = transitions / state_visit_counts[:, None]
     
-    #- TODO: Assert marginals.
     # Remove NaNs if necessary
-    # TODO ...
     transitions = np.nan_to_num(transitions)
     # We will run the trajectories for n number of times
     # keep track of node visit counts as well as transition counts. 
@@ -217,17 +211,6 @@ def compute_transition_matrix_emperical(maze):
 ####################################
 ############## Part 4 ##############
 ####################################
-
-"""
-Recompute the successor representation at the starting 
-position by repeatedly applying the transition matrix you 
-computed (for this it is opportune to turn the 
-SR matrix into a vector).
-
-1. uniform of the options available - analytically
-2. Non-invertible matrix.
-3. Singular matrix:- Bonus
-"""
 def compute_sr(transitions, i, j, gamma=0.98, shape=(9, 13)):
     # Given a transition matrix and a specific state 
     # (i, j), 
@@ -258,7 +241,7 @@ def compute_sr(transitions, i, j, gamma=0.98, shape=(9, 13)):
     return total.reshape(shape)
 
 #%%
-transitions = compute_transition_matrix(maze)
+transitions = compute_transition_matrix_empirical(maze) #compute_transition_matrix(maze)
 #%%
 # compute state representation for start state
 i, j = start
@@ -274,8 +257,7 @@ plt.show()
 ############################################
 ############## Part 5 (Bonus) ##############
 ############################################
-
-# You're on your own now
+# You're on your own now.
 #%%
 def compute_sr_bonus(transitions, i, j, gamma=0.98, shape=(9, 13)):
     # Given a transition matrix and a specific state 
@@ -302,13 +284,16 @@ sr_bonus = compute_sr_bonus(transitions, i, j,
 plot_maze(maze)
 plt.imshow(sr_bonus, cmap='hot')
 # plt.savefig("transition_iterate")
+plt.savefig("sr_bonus_start.png")
 plt.show()
 
+#%%
 i, j = (start[0]-2, start[1])
 print(f"Computing SR Bonus: {i}, {j}")
 sr_bonus = compute_sr_bonus(transitions, i, j, 
                             0.98, shape=maze.shape) 
 plot_maze(maze)
 plt.imshow(sr_bonus, cmap='hot')
-# plt.savefig("transition_iterate")
+plt.savefig("sr_bonus_opposite_wall.png")
 plt.show()
+# %%
