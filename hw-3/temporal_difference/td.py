@@ -90,8 +90,6 @@ def train_model(model, num_trials=100, learning_rate=0.1):
         v, w, deltas = run_trial(model)
         model = update_model(model, v, w, deltas)
         prediction_errors.append(deltas)
-    print(f"num trails: {num_trials}")
-    print(f"timestapm:deltas[0].shape: {deltas.shape}")
     return model, np.array(prediction_errors)
 #%%
 def pre_train_behavior(model, learning_rate=0.1):
@@ -120,10 +118,10 @@ def update_model(model, v, w, deltas, update_weights=False):
     Update the model with the new values.
     """
     model = SortedDict(model)
-    model["values"] = v
     model["dv"] = np.diff(v)
     model["deltas"] = deltas 
     if update_weights:
+        model["values"] = v
         model["weights"] = w
     return model
 
@@ -147,7 +145,7 @@ def initialize_model(num_time_steps=250):
 
 #%%
 # Generate example data
-def plot_prediction_error(model, deltas):
+def plot_prediction_error(model, deltas, save_path=None):
     u, r, v, w, dv = \
         model["stimulus"], \
         model["rewards"], \
@@ -182,12 +180,14 @@ def plot_prediction_error(model, deltas):
      
     ax.view_init(elev=15, azim=-110)  
     plt.show()
+    plt.savefig(save_path) if save_path else None
 
 #%%    
 def plot_model_behavior(pre_train_model, pre_train_deltas, 
-                     post_train_model, post_train_deltas):
+                        post_train_model, post_train_deltas, save_path=None):
 
-    t = np.linspace(0, 250, 250)  # Time points
+    num_time_steps = pre_train_model["stimulus"].shape[0]
+    t = np.linspace(0, num_time_steps, num_time_steps)  # Time points
     # Variables for "before" and "after"
     variables_before = {
         "u": pre_train_model["stimulus"], 
@@ -228,26 +228,10 @@ def plot_model_behavior(pre_train_model, pre_train_deltas,
 
     # Set common labels and layout
     fig.text(0.5, 0.04, 't (time)', ha='center')
-    #fig.text(0.04, 0.5, 'Variables', va='center', rotation='vertical')
     plt.tight_layout()
     plt.show()
-    if False:
-        sns.set_theme()
-        plt.figure(figsize=(15, 7))
-        plt.subplot(2, 2, 1)
-        plt.plot(u)
-        plt.title("Stimulus")
-        plt.subplot(2, 2, 2)
-        plt.plot(r)
-        plt.title("Reward")
-        plt.subplot(2, 2, 3)
-        plt.plot(v)
-        plt.title("Value State")
-        plt.subplot(2, 2, 4)
-        plt.plot(dv)
-        plt.title("\Delta v ")
-        plt.tight_layout()
-        plt.show()
+    plt.savefig(save_path) if save_path else None
+    
 
 #%%
 model = initialize_model()
@@ -260,6 +244,7 @@ post_train_model, post_train_deltas = post_train_behavior(trained_model, num_tri
 #%%
 plot_model_behavior(pre_train_model, pre_deltas, post_train_model, post_train_deltas)
 #%%
+#TODO don't know why v and dv are non-zero before training
 #%%
 plot_prediction_error(model, train_deltas)    
 #%%
@@ -268,71 +253,30 @@ plot_prediction_error(model, train_deltas)
 ## for each.
 
 #%%
-## Reward Timing 
+## Reward Timing  (1h)
 # 1. Give reward close to stimulus
 # 2. Give reward far from stimulus
+def experiment_reward_timing(stimulus_distance=20):
+    model = initialize_model()
+    model["rewards"] = add_bump(model["rewards"], 200 + stimulus_distance, bump_width=2)
+    pre_train_model, pre_deltas = pre_train_behavior(model, learning_rate=0.9)
+    trained_model, train_deltas = train_model(model, num_trials=2000, learning_rate=0.9)
+    post_train_model, post_train_deltas = post_train_behavior(trained_model, num_trials=2000, learning_rate=0.9)
+    plot_model_behavior(pre_train_model, pre_deltas, post_train_model, post_train_deltas)
+    plot_prediction_error(model, train_deltas)
+    
 #%%
-## Learning Rate
+## Learning Rate (1h)
 # 1. High Learning Rate
 # 2. Low Learning Rate
 
 #%%
-## Multiple Rewards
+## Multiple Rewards (3h)
 # 1. Provide two rewards
 # 2. Provide three rewards 
 
 #%%
-## Stochastic Rewards
+## Stochastic Rewards (4h)
 # 1. Randomly provide rewards with low noise
 # 2. Randomly provide rewards with high noise
 #%% 
-
-#%%
-# Example data generation
-t = np.linspace(0, 250, 250)  # Time points
-
-# Variables for "before" and "after"
-variables_before = {
-    "u": np.exp(-((t - 100)**2) / (2 * 5**2)),
-    "r": np.sin(t / 50),
-    "v": np.zeros_like(t),
-    "Δv": np.gradient(np.zeros_like(t), t),
-    "δ": np.exp(-((t - 100)**2) / (2 * 10**2))
-}
-
-variables_after = {
-    "u": np.exp(-((t - 100)**2) / (2 * 5**2)),
-    "r": np.sin(t / 50),
-    "v": np.heaviside(t - 100, 0.5),
-    "Δv": np.gradient(np.heaviside(t - 100, 0.5), t),
-    "δ": np.exp(-((t - 100)**2) / (2 * 10**2))
-}
-
-# Create the figure for Panel B
-n_vars = len(variables_before)
-fig, axes = plt.subplots(n_vars, 2, figsize=(10, 8), sharex=True, sharey=True)
-
-# Plot "before" and "after" for each variable
-for i, (var, data_before) in enumerate(variables_before.items()):
-    # "Before" plots
-    ax_before = axes[i, 0]
-    ax_before.plot(t, data_before, color='black')
-    ax_before.axvline(100, color="gray", linestyle="--", linewidth=0.8)  # Key event marker
-    if i == 0:
-        ax_before.set_title("Before")
-    ax_before.set_ylabel(var, rotation=0, labelpad=15)
-
-    # "After" plots
-    ax_after = axes[i, 1]
-    ax_after.plot(t, variables_after[var], color='black')
-    ax_after.axvline(100, color="gray", linestyle="--", linewidth=0.8)  # Key event marker
-    if i == 0:
-        ax_after.set_title("After")
-
-# Set common labels and layout
-fig.text(0.5, 0.04, 't (time)', ha='center')
-fig.text(0.04, 0.5, 'Variables', va='center', rotation='vertical')
-plt.tight_layout()
-plt.show()
-
-# %%
