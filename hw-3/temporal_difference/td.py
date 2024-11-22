@@ -52,6 +52,12 @@ def make_reward(n = num_time_steps):
     r = np.zeros(n)
     r = add_bump(r, 200, bump_width=2)
     return r
+#%%
+def make_reward_by_stimulus_distance(n = num_time_steps, stimulus_position_idx=100, stimulus_distance=50):
+    """."""
+    r = np.zeros(n)
+    r = add_bump(r, stimulus_position_idx + stimulus_distance, bump_width=2)
+    return r
 
 #%%
 def make_multiple_rewards(n = num_time_steps, num_rewards=2):
@@ -316,7 +322,28 @@ if False:
 ## Reward Timing  (1h)
 # 1. Give reward close to stimulus
 # 2. Give reward far from stimulus
-   
+def experiment_reward_timing(selected_condition, num_trials=2000, learning_rate=0.5):
+    model = initialize_model()
+    if selected_condition == "NEAR_STIMULUS":
+        model = model_from_template(model, overrides={"rewards": make_reward_by_stimulus_distance(stimulus_distance=20)})
+    elif selected_condition == "FAR_STIMULUS":
+        model = model_from_template(model, overrides={"rewards": make_reward_by_stimulus_distance(stimulus_distance=140)})
+    else:
+        raise ValueError("Invalid condition") 
+    
+    pre_train_model, pre_deltas = pre_train_behavior(model, learning_rate=learning_rate)
+    trained_model, train_deltas = train_model(model, num_trials=num_trials, learning_rate=learning_rate)
+    post_train_model, post_train_deltas = post_train_behavior(trained_model, num_trials=num_trials, learning_rate=learning_rate)
+
+    save_path = os.path.join(IMAGE_PATH, f"experiment_reward_timing_{selected_condition}.png")
+
+    plot_model_behavior(pre_train_model, pre_deltas,
+                        trained_model, train_deltas, 
+                        post_train_model, post_train_deltas, 
+                        save_path=save_path) 
+
+for condition in ["NEAR_STIMULUS", "FAR_STIMULUS"]:
+    experiment_reward_timing(condition)
 #%%
 ## Learning Rate (1h)
 # 1. High Learning Rate
@@ -337,6 +364,7 @@ def experiment_learning_rate(selected_condition, num_trials=2000, high_lr=0.5, l
 
 for condition in ["HIGH_LR", "LOW_LR"]:
     experiment_learning_rate(condition) 
+    
 #%%
 ## Multiple Rewards (3h)
 # 1. Provide two rewards.
@@ -346,7 +374,7 @@ def experiment_multiple_rewards(selected_condition, num_trials=2000, learning_ra
     if selected_condition == "SINGLE_REWARD":
         model = model_from_template(model, overrides={"rewards": make_reward()})
     elif selected_condition == "MULTIPLE_REWARDS":
-        model_from_template(model, overrides={"rewards": make_multiple_rewards(num_rewards=num_rewards)})
+        model = model_from_template(model, overrides={"rewards": make_multiple_rewards(num_rewards=num_rewards)})
     else:
         raise ValueError("Invalid condition") 
     
