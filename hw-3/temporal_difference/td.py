@@ -93,7 +93,7 @@ def train_model(model, num_trials=100, learning_rate=0.1):
     print(f"num trails: {num_trials}")
     print(f"timestapm:deltas[0].shape: {deltas.shape}")
     return model, np.array(prediction_errors)
-
+#%%
 def pre_train_behavior(model, learning_rate=0.1):
     """
     Pre-train behavior of the model. 
@@ -104,6 +104,7 @@ def pre_train_behavior(model, learning_rate=0.1):
     prediction_errors.append(deltas)
     return model, np.array(prediction_errors) 
 
+#%%
 def post_train_behavior(model, num_trials=100, learning_rate=0.1):
     """
     Post-train the behavior of the model.
@@ -182,14 +183,14 @@ def plot_prediction_error(model, deltas):
     ax.view_init(elev=15, azim=-110)  
     plt.show()
 
-
 #%%    
-def plot_final_state(model):
-    u, r, v, w, dv = \
+def plot_model_behavior(pre_train_model, pre_train_deltas, 
+                     post_train_model, post_train_deltas):
+
+    u, r, v, dv = \
         model["stimulus"], \
         model["rewards"], \
         model["values"], \
-        model["weights"], \
         model["dv"]
     sns.set_theme()
     plt.figure(figsize=(15, 7))
@@ -210,11 +211,17 @@ def plot_final_state(model):
 
 #%%
 model = initialize_model()
-model, deltas = train_model(model, num_trials=2000, learning_rate=0.9)
 #%%
-plot_final_state(model)
+pre_train_model, pre_deltas = pre_train_behavior(model, learning_rate=0.9)
 #%%
-plot_prediction_error(model, deltas)    
+trained_model, train_deltas = train_model(model, num_trials=2000, learning_rate=0.9)
+#%%
+post_train_model, post_train_deltas = post_train_behavior(trained_model, num_trials=2000, learning_rate=0.9)
+#%%
+plot_model_behavior(pre_train_model, pre_deltas, post_train_model, post_train_deltas)
+#%%
+#%%
+plot_prediction_error(model, train_deltas)    
 #%%
 ## Experiment with following parameters. 
 ## Plot and briefly describe your observations 
@@ -222,18 +229,25 @@ plot_prediction_error(model, deltas)
 
 #%%
 ## Reward Timing 
+# 1. Give reward close to stimulus
+# 2. Give reward far from stimulus
 #%%
 ## Learning Rate
+# 1. High Learning Rate
+# 2. Low Learning Rate
+
 #%%
-## Multiple Trials
+## Multiple Rewards
+# 1. Provide two rewards
+# 2. Provide three rewards 
+
 #%%
 ## Stochastic Rewards
+# 1. Randomly provide rewards with low noise
+# 2. Randomly provide rewards with high noise
 #%% 
 
 #%%
-import numpy as np
-import matplotlib.pyplot as plt
-
 # Example data generation
 t = np.linspace(0, 250, 250)  # Time points
 
