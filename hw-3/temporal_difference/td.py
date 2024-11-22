@@ -133,10 +133,10 @@ def make_stimulus(n=num_time_steps):
     u[100] = 1
     return u
 #%%
-def add_bump(r, idx, bump_width=5):
+def add_bump(r, idx, bump_width=2):
     """."""
-    decrements = np.linspace(1, 0.15, bump_width)
-    increments = np.linspace(0.15, 1, bump_width)
+    decrements = np.linspace(1, 0.25, bump_width)
+    increments = np.linspace(0.25, 1, bump_width)
     for i, d in enumerate(increments):
         r[idx - bump_width + i] = d
         
@@ -148,7 +148,7 @@ def add_bump(r, idx, bump_width=5):
 def make_reward(n = num_time_steps):
     """."""
     r = np.zeros(n)
-    r = add_bump(r, 200, bump_width=10)
+    r = add_bump(r, 200, bump_width=2)
     return r
 
 #%%
@@ -262,7 +262,7 @@ def plot_prediction_error(model, deltas):
     surf = ax.plot_surface(time, trials, deltas, 
                            cmap='gray', edgecolor='k', 
                            rstride=70, cstride=70, alpha=0.3)
-    # Add color bar to show the mapping of colors to z-values
+
     ax.set_xlabel('Time (t)')
     ax.set_ylabel('Trials')
     ax.set_zlabel('δ(t)')
@@ -298,8 +298,7 @@ def plot_final_state(model):
 
 #%%
 model = initialize_model()
-model, deltas = train_model(model, num_trials=2000, 
-                            learning_rate=0.9)
+model, deltas = train_model(model, num_trials=2000, learning_rate=0.9)
 #%%
 plot_final_state(model)
 #%%
