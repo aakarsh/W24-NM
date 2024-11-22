@@ -94,7 +94,7 @@ def update_weights(w, u, delta, t, epsilon=0.1):
     return w
 
 #%%
-def run_trial(model, learning_rate=0.1, reward_keep_probability=1.0):
+def run_trial(model, learning_rate=0.1, reward_keep_probability=1.0, update_model=True):
     """
     Run a single trial.
     """
@@ -106,7 +106,8 @@ def run_trial(model, learning_rate=0.1, reward_keep_probability=1.0):
         if reward > 0  and reward_keep_probability < 1:
             reward = r[t] if np.random.rand() < reward_keep_probability else 0
         d = delta(reward, v, t)
-        w = update_weights(w, u, d, t, epsilon=learning_rate)
+        if update_model:
+            w = update_weights(w, u, d, t, epsilon=learning_rate)
         deltas[t] = d
         # v(t) = \sum_{\tau=0}^{t} w(\tau)  u(t - \tau)
         v[t] = np.dot(w[0:t+1], u[t::-1])
@@ -117,7 +118,6 @@ def train_model(model, num_trials=100, learning_rate=0.1, reward_keep_probabilit
     """
     Run multiple trials.
     """
-    model = SortedDict(model)
     prediction_errors = [] 
     for _ in range(num_trials): # number of trials
         v, w, deltas = run_trial(model, learning_rate=learning_rate, reward_keep_probability=reward_keep_probability)
@@ -130,21 +130,21 @@ def pre_train_behavior(model, learning_rate=0.1):
     """
     Pre-train behavior of the model. 
     """
-    model = SortedDict(model)
+    model = clone_model(model)
     prediction_errors = []
-    v, w, deltas = run_trial(model, learning_rate=learning_rate)
+    v, w, deltas = run_trial(model, learning_rate=learning_rate, update_model=False)
     model = update_model(model, v, w, deltas, update_weights=False)
     prediction_errors.append(deltas)
-    return model, np.array(prediction_errors)
+    return clone_model(model), np.array(prediction_errors).copy()
 
 #%%
 def post_train_behavior(model, learning_rate=0.1):
     """
     Post-train the behavior of the model.
     """
-    model = SortedDict(model)
+    model = clone_model(model)
     prediction_errors = []
-    v, w, deltas = run_trial(model, learning_rate=learning_rate)
+    v, w, deltas = run_trial(model, learning_rate=learning_rate, update_model=False)
     model = update_model(model, v, w, deltas, update_weights=False)
     prediction_errors.append(deltas)
     return model, np.array(prediction_errors)
@@ -153,7 +153,6 @@ def update_model(model, v, w, deltas, update_weights=False):
     """
     Update the model with the new values.
     """
-    model = SortedDict(model)
     model["dv"] = np.diff(v)
     model["deltas"] = deltas 
     if update_weights:
@@ -178,6 +177,19 @@ def initialize_model(num_time_steps=250):
              "weights": w,
              "dv": dv
     })
+    
+def clone_model(model):
+    """
+    Clone a model.
+    """
+    return SortedDict({
+        "stimulus": np.copy(model["stimulus"]),
+        "rewards": np.copy(model["rewards"]),
+        "values": np.copy(model["values"]),
+        "weights": np.copy(model["weights"]),
+        "dv": np.copy(model["dv"])
+    })
+    
 #%%
 def model_from_template(model, overrides = {}):
     """
@@ -299,25 +311,8 @@ def plot_model_behavior(pre_train_model, pre_train_deltas,
     plt.savefig(save_path) if save_path else None
     plt.show()
     
-if False:
-    #%%
-    model = initialize_model()
-    #%%
-    pre_train_model, pre_train_deltas =\
-    pre_train_behavior(model, learning_rate=0.9)
-    #%%
-    trained_model, train_deltas = \
-    train_model(model, num_trials=2000, learning_rate=0.9)
-    #%%
-    post_train_model, post_train_deltas = \
-    post_train_behavior(trained_model, learning_rate=0.9)
-    #%%
-    plot_model_behavior(pre_train_model, pre_train_deltas, 
-                    trained_model, train_deltas,
-                    post_train_model, post_train_deltas)
 #%%
-# TODO don't know why v 
-# and dv are non-zero before training
+# TODO: don't know why v  and dv are non-zero before training
 #%%
 #%%
 ## Experiment with following parameters. 
@@ -339,7 +334,7 @@ def experiment_reward_timing(selected_condition, num_trials=2000, learning_rate=
     
     pre_train_model, pre_deltas = pre_train_behavior(model, learning_rate=learning_rate)
     trained_model, train_deltas = train_model(model, num_trials=num_trials, learning_rate=learning_rate)
-    post_train_model, post_train_deltas = post_train_behavior(trained_model, num_trials=num_trials, learning_rate=learning_rate)
+    post_train_model, post_train_deltas = post_train_behavior(trained_model,  learning_rate=learning_rate)
 
     save_path = os.path.join(IMAGE_PATH, f"experiment_reward_timing_{selected_condition}.png")
 
@@ -359,7 +354,7 @@ def experiment_learning_rate(selected_condition, num_trials=2000, high_lr=0.5, l
     model = initialize_model()
     pre_train_model, pre_deltas = pre_train_behavior(model, learning_rate=learning_rate)
     trained_model, train_deltas = train_model(model, num_trials=num_trials, learning_rate=learning_rate)
-    post_train_model, post_train_deltas = post_train_behavior(trained_model, num_trials=num_trials, learning_rate=learning_rate)
+    post_train_model, post_train_deltas = post_train_behavior(trained_model,  learning_rate=learning_rate)
 
     save_path = os.path.join(IMAGE_PATH, f"experiment_learning_rate_{selected_condition}.png")
 
@@ -386,7 +381,7 @@ def experiment_multiple_rewards(selected_condition, num_trials=2000, learning_ra
     
     pre_train_model, pre_deltas = pre_train_behavior(model, learning_rate=learning_rate)
     trained_model, train_deltas = train_model(model, num_trials=num_trials, learning_rate=learning_rate)
-    post_train_model, post_train_deltas = post_train_behavior(trained_model, num_trials=num_trials, learning_rate=learning_rate)
+    post_train_model, post_train_deltas = post_train_behavior(trained_model,  learning_rate=learning_rate)
 
     save_path = os.path.join(IMAGE_PATH, f"experiment_multiple_rewards_{selected_condition}.png")
 
@@ -410,7 +405,7 @@ def experiment_stochastic_rewards(selected_condition, num_trials=2000, learning_
     trained_model, train_deltas = train_model(model, num_trials=num_trials, 
                                               learning_rate=learning_rate, 
                                               reward_keep_probability=reward_keep_probability)
-    post_train_model, post_train_deltas = post_train_behavior(trained_model, num_trials=num_trials, learning_rate=learning_rate)
+    post_train_model, post_train_deltas = post_train_behavior(trained_model,  learning_rate=learning_rate)
 
     save_path = os.path.join(IMAGE_PATH, f"experiment_stochastic_rewards_{selected_condition}.png")
 

@@ -130,7 +130,7 @@ for i in range(5001):
         plot_maze(maze)
         plt.imshow(succ_repr, cmap='hot')
         if i == 5000:
-             plt.savefig("empirical")
+             plt.savefig(f"empirical-{i}")
         plt.show()
 
 #%%
@@ -241,7 +241,13 @@ def compute_sr(transitions, i, j, gamma=0.98, shape=(9, 13)):
     return total.reshape(shape)
 
 #%%
-transitions = compute_transition_matrix_empirical(maze) #compute_transition_matrix(maze)
+empirical_transitions = compute_transition_matrix_empirical(maze)
+transitions = compute_transition_matrix(maze) 
+plt.imshow(empirical_transitions)
+plt.show()
+plt.imshow(transitions)
+plt.show()
+#compute_transition_matrix(maze)
 #%%
 # compute state representation for start state
 i, j = start
