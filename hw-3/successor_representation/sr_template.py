@@ -39,7 +39,6 @@ plt.show()
 ####################################
 ############## Part 1 ##############
 ####################################
-
 def is_inside_maze(maze, move):
     return move[0] >= 0 and move[0] < maze.shape[0] and move[1] >= 0 and move[1] < maze.shape[1]
 
@@ -48,7 +47,18 @@ def is_free_cell(maze, move):
 
 def check_legal(maze, move):
     return is_inside_maze(maze, move) and is_free_cell(maze, move)
-    
+
+def reachable_moves(maze, pos):
+    # return a list of all reachable moves from a given position
+    legal_transitions = [(0, 1), (0, -1), (1, 0), (-1, 0)]  
+    possible_moves = [(pos[0] + move[0], pos[1] + move[1]) for move in legal_transitions]
+    legal_moves = [move for move in possible_moves if check_legal(maze, move)]
+    return legal_moves 
+
+def select_random(moves, default_move):
+    # return a random element from the list of moves
+    return moves[np.random.randint(0, len(moves))] if len(moves) > 0 else  default_move
+
 def random_walk(maze, start, n_steps):
     # Perform a single random walk in the 
     # given maze, starting from start, 
@@ -56,17 +66,14 @@ def random_walk(maze, start, n_steps):
     #
     # moves into the wall and out of the 
     # maze boundary are not possible
-    print(f"Starting random walk at {start} for {n_steps} steps")
-    
-    # initialize list to store positions
+    #print(f"Starting random walk at {start} for {n_steps} steps")
+    # Initialize list to store positions
     positions = []
-    legal_moves = [(0, 1), (0, -1), (1, 0), (-1, 0)]  
     pos = start
     for _ in range(n_steps+1):
         positions.append(pos)
-        next_moves = [(pos[0] + move[0], pos[1] + move[1]) for move in legal_moves] 
-        filtered_moves = [move for move in next_moves if check_legal(maze ,move)] 
-        pos = filtered_moves[np.random.randint(0, len(filtered_moves))] if len(filtered_moves) > 0 else pos # no legal moves?
+        filtered_moves = reachable_moves(maze, pos)
+        pos = select_random(filtered_moves, pos)
     # return a list of length n_steps + 1, containing the 
     # starting position and all subsequent locations as e.g. 
     # tuples or size (2) arrays 
@@ -74,7 +81,7 @@ def random_walk(maze, start, n_steps):
     return positions
 
 def plot_path(maze, path):
-    # plot a maze and a path in it
+    # Plot a maze and a path in it
     plot_maze(maze)
     path = np.array(path)
     plt.plot(path[:, 1], path[:, 0], c='red', lw=3)
@@ -90,24 +97,31 @@ plot_path(maze, path)
 ####################################
 ############## Part 2 ##############
 ####################################
-
-
 def learn_from_traj(succ_repr, trajectory, gamma=0.98, alpha=0.02):
-    # Write a function to update a given successor representation (for the state at which the trajectory starts) using an example trajectory
-    # using discount factor gamma and learning rate alpha
-
-    TODO...
-
+    # Write a function to update a given successor representation 
+    # (for the state at which the trajectory starts) 
+    # using an example trajectory using discount factor 
+    # gamma and learning rate alpha
     # return the updated successor representation
+    start_state = trajectory[0]
+    for next_state in trajectory[1:]: # Skip the first state
+        for i in range(succ_repr.shape[0]):
+            for j in range(succ_repr.shape[1]):
+                occupancy_increment = 1 if (i, j) == next_state else 0
+                succ_repr[i, j] = succ_repr[i, j] + \
+                    alpha * (occupancy_increment + (gamma * succ_repr[next_state[0], next_state[1]]) - succ_repr[i, j])
     return succ_repr
 
-# initialize successor representation
+# Initialize successor representation
 succ_repr = np.zeros_like(maze)
 
-# sample a whole bunch of trajectories (reduce this number if this code takes too long, but it shouldn't take longer than a minute with reasonable code)
+# sample a whole bunch of trajectories 
+# (reduce this number if this code takes too long, 
+# but it shouldn't take longer than a minute with reasonable code)
 for i in range(5001):
-    # sample a path (we use 340 steps here to sample states until the discounting becomes very small)
-    path = random_walk(maze, start, 340)
+    # Sample a path (we use 340 steps here to sample states until the 
+    # discounting becomes very small)
+    path = random_walk(maze, start, 340) #AN: This is a full trajectory
     # update the successor representation
     succ_repr = learn_from_traj(succ_repr, path, alpha=0.02)  # choose a small learning rate
 
@@ -115,44 +129,83 @@ for i in range(5001):
     if i in [0, 10, 100, 1000, 5000]:
         plot_maze(maze)
         plt.imshow(succ_repr, cmap='hot')
-        # if i == 5000:
-        #     plt.savefig("empirical")
+        if i == 5000:
+             plt.savefig("empirical")
         plt.show()
 
-
+#%%
 ####################################
 ############## Part 3 ##############
 ####################################
-
+def position_idx(i, j, maze):
+    return i * maze.shape[1] + j
 
 def compute_transition_matrix(maze):
-    # for a given maze, compute the transition matrix from any state to any other state under a random walk policy
-    # (you will need to think of a good way to map any 2D grid coordinates onto a single number for this)
+    # For a given maze, compute the transition 
+    # matrix from any state to any other state under 
+    # a random walk policy.  (You will need to 
+    # think of a good way to map any 2D grid 
+    # coordinates onto a single number for this).
 
-    # create a matrix over all state pairs
-    transitions = np.zeros(TODO...)
+    # Create a matrix over all state-pairs.
+    #
+    num_states = maze.size * maze.size  
+    # np.zeros(TODO..) 
+    transitions = np.zeros((num_states, num_states)) 
+    state_visit_counts = np.zeros(num_states)
+    num_iterations = 10000
 
-    # iterate over all states, filling in the transition probabilities to all other states on the next step (only one step into the future)
-    TODO...
+    for _ in range(num_iterations): 
+        # Iterate over all states, filling in the 
+        # transition probabilities to all other states 
+        # on the next step (only one step into the future)
+        trajectory = random_walk(maze, start, 340)  # 340 steps
+
+        for s, s_next in zip(trajectory[:-1], trajectory[1:]): 
+            i,j = s
+            s_idx = position_idx(i, j, maze) 
+            s_n_idx = position_idx(s_next[0], s_next[1], maze)
+            print(f"State: {s_idx} Next State: {s_n_idx}")
+            state_visit_counts[s_idx] += 1
+            transitions[s_idx, s_n_idx] += 1
+
+    # TODO ...
+    # Normalize transitions if neccessary.
+    # TODO ...
+    transitions = transitions / state_visit_counts[:, None]
     
-    # normalize transitions if neccessary
-    TODO...
-
-    # remove NaNs if necessary
-    TODO...
-
+    #- TODO: Assert marginals.
+    # Remove NaNs if necessary
+    # TODO ...
+    transitions = np.nan_to_num(transitions)
+    # We will run the trajectories for n number of times
+    # keep track of node visit counts as well as transition counts. 
+    # normalize and return the probabilities as a matrix. 
     return transitions
 
-
+#%%
 ####################################
 ############## Part 4 ##############
 ####################################
 
+"""
+Recompute the successor representation at the starting 
+position by repeatedly applying the transition matrix you 
+computed (for this it is opportune to turn the 
+SR matrix into a vector).
 
+1. uniform of the options available - analytically
+2. Non-invertible matrix.
+3. Singular matrix:- Bonus
+"""
 def compute_sr(transitions, i, j, gamma=0.98):
-    # given a transition matrix and a specific state (i, j), compute the successor representation of that state with discount factor gamma
+    # Given a transition matrix and a specific state 
+    # (i, j), 
+    # compute the successor representation of that state with 
+    # discount factor gamma
 
-    # initialize things (better to represent the current discounted occupancy as a vector here)
+    # initialize things (better to represent the current 
+    # discounted occupancy as a vector here)
     current_discounted_occupancy = np.zeros(TODO...)
     total = current_discounted_occupancy.copy()
     TODO...
@@ -161,11 +214,13 @@ def compute_sr(transitions, i, j, gamma=0.98):
     for _ in range(340):
         TODO...
 
-    # return the successor representation, maybe reshape your vector into the maze shape now
+    # return the successor representation, maybe reshape your 
+    # vector into the maze shape now.
     return total.reshape(TODO...)
 
+#%%
 transitions = compute_transition_matrix(maze)
-
+#%%
 # compute state representation for start state
 i, j = start
 sr = compute_sr(transitions, i, j, 0.98)
