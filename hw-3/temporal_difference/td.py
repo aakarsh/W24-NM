@@ -98,7 +98,7 @@ def train_model(model, num_trials=100, learning_rate=0.1):
     model = SortedDict(model)
     prediction_errors = [] 
     for _ in range(num_trials): # number of trials
-        v, w, deltas = run_trial(model)
+        v, w, deltas = run_trial(model, learning_rate=learning_rate)
         model = update_model(model, v, w, deltas)
         prediction_errors.append(deltas)
     return model, np.array(prediction_errors)
@@ -195,8 +195,8 @@ def plot_prediction_error(model, deltas, ax=None, save_path=None):
      
     ax.view_init(elev=15, azim=-110)  
     if show:
-        plt.show()
         plt.savefig(save_path) if save_path else None
+        plt.show()
 
 #%%    
 def plot_model_behavior(pre_train_model, pre_train_deltas, 
@@ -269,8 +269,8 @@ def plot_model_behavior(pre_train_model, pre_train_deltas,
     #for ax in axes: ax.legend()
     # Set common labels and layout
     fig.text(0.5, 0.04, 't (time)', ha='center')
-    plt.show()
     plt.savefig(save_path) if save_path else None
+    plt.show()
     
 
 #%%
@@ -314,7 +314,21 @@ def experiment_reward_timing(stimulus_distance=20):
 ## Learning Rate (1h)
 # 1. High Learning Rate
 # 2. Low Learning Rate
+def experiment_learning_rate(selected_condition, high_lr=0.9, low_lr=0.05):
+    learning_rate = high_lr if "HIGH_LR" == selected_condition else low_lr 
+    model = initialize_model()
+    pre_train_model, pre_deltas = pre_train_behavior(model, learning_rate=learning_rate)
+    trained_model, train_deltas = train_model(model, num_trials=2000, learning_rate=learning_rate)
+    post_train_model, post_train_deltas = post_train_behavior(trained_model, num_trials=2000, learning_rate=learning_rate)
+    save_path = os.path.join(IMAGE_PATH, f"experiment_learning_rate_{selected_condition}.png")
 
+    plot_model_behavior(pre_train_model, pre_deltas,
+                        trained_model, train_deltas, 
+                        post_train_model, post_train_deltas, 
+                        save_path=save_path)
+
+for condition in ["HIGH_LR", "LOW_LR"]:
+    experiment_learning_rate(condition) 
 #%%
 ## Multiple Rewards (3h)
 # 1. Provide two rewards
