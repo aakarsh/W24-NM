@@ -187,27 +187,67 @@ def plot_prediction_error(model, deltas):
 def plot_model_behavior(pre_train_model, pre_train_deltas, 
                      post_train_model, post_train_deltas):
 
-    u, r, v, dv = \
-        model["stimulus"], \
-        model["rewards"], \
-        model["values"], \
-        model["dv"]
-    sns.set_theme()
-    plt.figure(figsize=(15, 7))
-    plt.subplot(2, 2, 1)
-    plt.plot(u)
-    plt.title("Stimulus")
-    plt.subplot(2, 2, 2)
-    plt.plot(r)
-    plt.title("Reward")
-    plt.subplot(2, 2, 3)
-    plt.plot(v)
-    plt.title("Value State")
-    plt.subplot(2, 2, 4)
-    plt.plot(dv)
-    plt.title("\Delta v ")
+    t = np.linspace(0, 250, 250)  # Time points
+    # Variables for "before" and "after"
+    variables_before = {
+        "u": pre_train_model["stimulus"], 
+        "r": pre_train_model["rewards"], 
+        "v": pre_train_model["values"], 
+        "Δv":np.append(np.array([0]), pre_train_model["dv"]),
+        "δ": pre_train_deltas.flatten()
+    }
+
+    variables_after = {
+        "u": post_train_model["stimulus"], 
+        "r": post_train_model["rewards"], 
+        "v": post_train_model["values"], 
+        "Δv":np.append(np.array([0]), post_train_model["dv"]),
+        "δ": post_train_deltas.flatten()
+    }
+
+    # Create the figure for Panel B
+    n_vars = len(variables_before)
+    fig, axes = plt.subplots(n_vars, 2, figsize=(14, 8), sharex=True, sharey=True)
+
+    # Plot "before" and "after" for each variable
+    for i, (var, data_before) in enumerate(variables_before.items()):
+        # "Before" plots
+        ax_before = axes[i, 0]
+        ax_before.plot(t, data_before, color='black')
+        ax_before.axvline(100, color="gray", linestyle="--", linewidth=0.8)  # Key event marker
+        if i == 0:
+            ax_before.set_title("Before")
+        ax_before.set_ylabel(var, rotation=0, labelpad=15)
+
+        # "After" plots
+        ax_after = axes[i, 1]
+        ax_after.plot(t, variables_after[var], color='black')
+        ax_after.axvline(100, color="gray", linestyle="--", linewidth=0.8)  # Key event marker
+        if i == 0:
+            ax_after.set_title("After")
+
+    # Set common labels and layout
+    fig.text(0.5, 0.04, 't (time)', ha='center')
+    #fig.text(0.04, 0.5, 'Variables', va='center', rotation='vertical')
     plt.tight_layout()
     plt.show()
+    if False:
+        sns.set_theme()
+        plt.figure(figsize=(15, 7))
+        plt.subplot(2, 2, 1)
+        plt.plot(u)
+        plt.title("Stimulus")
+        plt.subplot(2, 2, 2)
+        plt.plot(r)
+        plt.title("Reward")
+        plt.subplot(2, 2, 3)
+        plt.plot(v)
+        plt.title("Value State")
+        plt.subplot(2, 2, 4)
+        plt.plot(dv)
+        plt.title("\Delta v ")
+        plt.tight_layout()
+        plt.show()
 
 #%%
 model = initialize_model()
