@@ -51,7 +51,6 @@ cue_mapping = {1: 'Go+', 2: 'Go-', 3: 'NoGo+', 4: 'NoGo-'}  # Go+ = Go to win, G
     Only the bar plots are important here, no need for error 
     bars or significance tests.
 """
-# TODO
 def compute_accuracy(df, cue_mapping=cue_mapping):
     accuracy_map = {}
     for cue in cue_mapping:
@@ -229,7 +228,6 @@ def model_1(data, learning_rate, beta):
         """
         prediction_error = (beta * reward) - q[state, action] 
         return q[state, action] + learning_rate * prediction_error
-    
     return model_log_likelihood(data, update_rule) 
 
 #%%
@@ -279,6 +277,28 @@ Model-3: Assumes that:
     * No bias parameters
         * bias_{app} = bias_{wth} = 0
 """
+def model_3(data, learning_rate_rew, learning_rate_pun, beta):
+    """
+    """
+    def update_rule(q, state, action, reward):
+        """
+        q: np.ndarray
+            The Q-values
+        state: int
+            The current state
+        action: int
+            The current action
+        reward: int
+            The reward
+        """
+        if reward == 1:
+            prediction_error = (beta * reward) - q[state, action]
+            return q[state, action] + learning_rate_rew * prediction_error
+        elif reward == -1:
+            prediction_error = (beta * reward) - q[state, action]
+            return q[state, action] + learning_rate_pun * prediction_error
+        
+    return model_log_likelihood(data, update_rule)  
 
 """
 Model-4: Assumes that:
@@ -287,7 +307,25 @@ Model-4: Assumes that:
     * Biases: 
         * bias_{app} != bias_{wth} - (separate biases to approach and withhold responding)
 """
-
+def model_4(data, learning_rate, beta, bias_app, bias_wth):
+    """
+    """
+    def update_rule(q, state, action, reward):
+        """
+        q: np.ndarray
+            The Q-values
+        state: int
+            The current state
+        action: int
+            The current action
+        reward: int
+            The reward
+        """
+        prediction_error = (beta * reward) - q[state, action]
+        
+        return False #q[state, action] + learning_rate * prediction_error + bias_app - bias_wth
+    
+    return model_log_likelihood(data, update_rule)
 """
 Model-5: Assumes that:
     * \epsilon - learning rate
@@ -319,6 +357,22 @@ method = 'Nelder-Mead'
 def BIC(...):
     return ...
 
+"""
+Optimize the models: 
+    -fitting all the parameters of each model to each individual subject, 
+    - using the scipy minimize function. 
+
+Pay attention to initialize the parameters 
+    - to reasonable values 
+    - set sensible bounds for each parameter 
+        (since Q-values get turned into probabilities 
+            through a softmax, which uses an exponential function, 
+            you may have to limit some of the parameters to certain magnitudes, 
+            to prevent overflow errors). 
+    - Given the number of models this can take some minutes, 
+        to save time you can e.g.  only apply the logarithm at the end, 
+        rather than during every iteration of your for-loop
+"""
 #%%
 for j, learner in enumerate([model_1]):
 
@@ -339,6 +393,26 @@ for j, learner in enumerate([model_1]):
 
     # compute BIC
 
+"""
+
+- Sum up the optimized log-likelihoods across all subjects for each model ?
+
+- Use this and all other relevant values to compute the BIC score for each model ?
+  (using e.g. the BIC equation of Wikipedia). 
+  
+- What does this tell you about which model describes the data best ?
+
+"""
+
+
+
+"""
+for the last model:
+    - compare the fitted :
+        - \epsilon_{app} 
+        - \epsilon_{wth} 
+    - How do you interpret the difference in their means?
+"""
 
 # Plot learning rates of the last model.
 
