@@ -51,7 +51,7 @@ cue_mapping = {1: 'Go+', 2: 'Go-', 3: 'NoGo+', 4: 'NoGo-'}  # Go+ = Go to win, G
     bars or significance tests.
 """
 # TODO
-def plot_cue_accuracy(df, cue_mapping=cue_mapping, save_path='cue_accuracy.png'):
+def compute_accuracy(df, cue_mapping=cue_mapping):
     accuracy_map = {}
     for cue in cue_mapping:
         # Subset the data for the current cue
@@ -77,8 +77,10 @@ def plot_cue_accuracy(df, cue_mapping=cue_mapping, save_path='cue_accuracy.png')
             # Thus accuracy is the inverse of the mean of the pressed column 
             accuracy_map[cue_mapping[cue]] = 1 - cue_df['pressed'].mean()
             print(f'NoGo-: {accuracy_map[cue_mapping[cue]]}')
-
-
+    return accuracy_map
+    
+def plot_cue_accuracy(df, save_path='cue_accuracy.png'):
+    accuracy_map = compute_accuracy(df)
     # Plot the accuracy as a bar plot, with seaborn
     labels = {
         'Go+': 'Go to Win',
@@ -96,41 +98,44 @@ def plot_cue_accuracy(df, cue_mapping=cue_mapping, save_path='cue_accuracy.png')
     plt.show()
 
 ## Plot the accuracy for each cue. 
-# Note that Don't go to win has lowest accuracy, 
-# while Go to Win has highest accuracy
+# Note that Don't go to win has lowest accuracy, while 
+# Go to Win has highest accuracy.
 plot_cue_accuracy(df)
+accuracy_map = compute_accuracy(df)
+assert accuracy_map['Go+'] >= accuracy_map['NoGo+']
+assert min(accuracy_map.values()) == accuracy_map['NoGo+']
+assert max(accuracy_map.values()) == accuracy_map['Go+']
 #%%
-
 """
 Program the log likelihood functions of the models 1 to 7 
 (including) presented in 
-    ”Disentangling the Roles of Approach, Activation and 
-    Valence in Instrumental and Pavlovian Responding” 
+    "Disentangling the Roles of Approach, Activation and 
+    Valence in Instrumental and Pavlovian Responding" 
     
     (see Table 2 of that paper for the model numbering and 
     relevant parameters). 
     
-    The paper uses these parameters 
-            - Learning Rate ε
-            - Feedback Sensitivity β
-                - The general feedback sensitivity β 
-                can be replaced by separate reward and punishment sensitivities ρ 
-                (we don't include a sensitivity for omission) 
-                - There can be different learning rates ε 
+    The paper uses these parameters:
+            - Learning Rate ε:
+            - Feedback Sensitivity β:
+                - The general feedback sensitivity β. 
+                    Can be replaced by separate reward and punishment 
+                    sensitivities ρ 
+                    (we don't include a sensitivity for omission) 
+                    - There can be different learning rates ε 
                 for:
-                    - Reward, 
-                    - Feedback Omission/no-reward-no-punish, 
+                    - Reward: 
+                    - Feedback Omission/No-reward-No-punishment 
                     - Punishment 
                         (The paper doesn't make use of omissions, 
                         so they use only two learning rates, 
                         you will need three.)
                     - There can be a: 
-                        - General bias to approach: $bias_{app}$
-                        - General bias to withhold responding: $bias_{wth}$
+                        - $bias_{app}$ - General bias to approach. 
+                        -$bias_{wth}$  - General bias to withhold responding.
 """
 # Define yourself a softmax function
 def softmax(x):
-    # TODO:
     return np.exp(x) / np.sum(np.exp(x), axis=0) 
 
 def model_1(data, learning_rate, beta):
@@ -147,7 +152,9 @@ def model_1(data, learning_rate, beta):
 
 
 #%%
-method = 'Nelder-Mead'  # this optimization should work for the given data, but feel free to try others as well, they might be faster
+method = 'Nelder-Mead'  
+# This optimization should work for the given data, 
+# but feel free to try others as well, they might be faster.
 
 # define a function to compute the BIC
 def BIC(...):
