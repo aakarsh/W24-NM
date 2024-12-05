@@ -107,7 +107,7 @@ assert min(accuracy_map.values()) == accuracy_map['NoGo+']
 assert max(accuracy_map.values()) == accuracy_map['Go+']
 #%%
 """
-Program the log likelihood functions of the models 1 to 7 
+Program the log-likelihood functions of the models 1 to 7.
 (including) presented in 
     "Disentangling the Roles of Approach, Activation and 
     Valence in Instrumental and Pavlovian Responding" 
@@ -121,7 +121,7 @@ Program the log likelihood functions of the models 1 to 7
                 - The general feedback sensitivity β. 
                     Can be replaced by separate reward and punishment 
                     sensitivities ρ 
-                    (we don't include a sensitivity for omission) 
+                    (We don't include a sensitivity for omission) 
                     - There can be different learning rates ε 
                 for:
                     - Reward: 
@@ -129,27 +129,131 @@ Program the log likelihood functions of the models 1 to 7
                     - Punishment 
                         (The paper doesn't make use of omissions, 
                         so they use only two learning rates, 
-                        you will need three.)
+                        you will need three).
                     - There can be a: 
-                        - $bias_{app}$ - General bias to approach. 
-                        -$bias_{wth}$  - General bias to withhold responding.
+                        - $bias_{app}$  - General bias to approach. 
+                        - $bias_{wth}$  - General bias to withhold responding.
 """
 # Define yourself a softmax function
 def softmax(x):
-    return np.exp(x) / np.sum(np.exp(x), axis=0) 
+    return np.exp(x)/np.sum(np.exp(x), axis=0) 
 
+def subject_df(df, subject_id):
+    return df[df['ID'] == subject_id]
+
+def num_cues(subject_df):
+    return len(np.unique(subject_df['cue']))
+
+def num_states(subject_df):
+    return num_cues(subject_df) 
+
+def num_trials(subject_df):
+    return len(subject_df)
+
+def num_actions(subject_df):
+    return len([1, 0]) 
+
+def num_outcomes(subject_df):
+    return len([1, 0, -1])
+
+def empty_q(num_cues, num_actions):
+    return np.zeros((num_cues, num_actions))
+
+#%%
+first_subject_df = subject_df(df, 0)
+#%%
+
+"""
+ Model-1 Assumes that:
+    * \epsilon - learning rate
+    * \beta - feedback sensitivity
+        * $-\rho_{pun} = \rho_{rew} = \beta$
+    * No bias parameters
+        * bias_{app} = bias_{wth} = 0
+"""
 def model_1(data, learning_rate, beta):
+    """
+    data: pd.DataFrame
+        The data of one subject
+    learning_rate: float
+        The learning rate parameter
+    beta: float
+        The feedback sensitivity parameter
+    """
     # Run a q-learning model on the data,  return the 
     # log-likelihood parameters are learning rate and beta, 
     # the feedback sensitivity.
-    q = np.zeros(...)
-    log_likelihood = ...
+    q = empty_q(num_states(data), num_actions(data))
+    
+    log_likelihood = 0
 
-    for i in range(len(data)):
-        ...
+    for t in range(len(data)):
+        # Extract the current trial
+        trial = data.iloc[t]
+        # Extract the current state and action
+        state = trial['cue'] - 1 # 0-indexed
+        # Extract the subject's response
+        action = trial['pressed']
+        # Extract the reward
+        reward = trial['outcome']
+        # Compute the probability of the action
+        prob = softmax(q[state])
+        
+        # Compute the log-likelihood
+        log_likelihood += np.log(prob[action])
+         
+        # Update the Q-values - feedback sensitive prediction error.
+        prediction_error = (beta * reward) - q[state, action] 
+        q[state, action] += learning_rate * prediction_error
+         
+    return -log_likelihood
 
-    return ...
+"""
+Model-2: Assumes that:
+    * \epsilon - learning rate
+    * \rho_pun ,\rho_rew - feedback sensitivity
+        * \rho_pun != \rho_rew - (separate reward and punishment sensitivities) 
+    * No bias parameters
+        * bias_{app} = bias_{wth} = 0 
+"""
 
+"""
+Model-3: Assumes that:
+    * \epsilon_new, \epsilon_rew - learning rates
+    * \beta - feedback sensitivity
+    * No bias parameters
+        * bias_{app} = bias_{wth} = 0
+"""
+
+"""
+Model-4: Assumes that:
+    * \epsilon - learning rate
+    * \beta - feedback sensitivity
+    * Biases: 
+        * bias_{app} != bias_{wth} - (separate biases to approach and withhold responding)
+"""
+
+"""
+Model-5: Assumes that:
+    * \epsilon - learning rate
+    * \rho_pun ,\rho_rew - feedback sensitivity
+    * bias_{app}, bias_{wth} - biases: 
+        * bias_{app} != bias_{wth} - (separate biases to approach and withhold responding)
+"""
+
+"""
+Model-6: Assumes that:
+    * \epsilon -  learning rate
+    * \rho_rew^{app}, \rho_rew^{wth}, \rho_pun^{app}, \rho_pun^{wth} - feedback sensitivity
+    * bias_{app}, bias_{wth} - biases:
+"""
+
+"""
+Model-7: Assumes that:
+    * \epsilon_{app}, \epsilon_{wth} - learning rates
+    * \rho_rew, \rho_pun - feedback sensitivity
+    * bias_{app}, bias_{wth} - biases:
+"""
 
 #%%
 method = 'Nelder-Mead'  
@@ -181,11 +285,7 @@ for j, learner in enumerate([model_1]):
     # compute BIC
 
 
-# plot learning rates of the last model
+# Plot learning rates of the last model.
 
 
 # Bonus
-
-
-    
-
