@@ -2,6 +2,7 @@
     Example structure for fitting multiple models, feel free to modify to your liking
 """
 #%%
+from numba import njit
 import seaborn as sns
 import pandas as pd
 import numpy as np
@@ -135,6 +136,7 @@ Program the log-likelihood functions of the models 1 to 7.
                         - $bias_{wth}$  - General bias to withhold responding.
 """
 # Define yourself a softmax function
+@njit
 def softmax(x):
     return np.exp(x)/np.sum(np.exp(x), axis=0) 
 
@@ -162,23 +164,14 @@ def empty_q(num_cues, num_actions):
 #%%
 first_subject_df = subject_df(df, 0)
 #%%
-
-"""
- Model-1 Assumes that:
-    * \epsilon - learning rate
-    * \beta - feedback sensitivity
-        * $-\rho_{pun} = \rho_{rew} = \beta$
-    * No bias parameters
-        * bias_{app} = bias_{wth} = 0
-"""
-def model_1(data, learning_rate, beta):
+def model_log_likelihood(data, q_update):
     """
     data: pd.DataFrame
         The data of one subject
-    learning_rate: float
-        The learning rate parameter
-    beta: float
-        The feedback sensitivity parameter
+    q_update: function
+        The function to update the Q-values
+    model_params: dict
+        The parameters of the model
     """
     # Run a q-learning model on the data,  return the 
     # log-likelihood parameters are learning rate and beta, 
@@ -201,13 +194,53 @@ def model_1(data, learning_rate, beta):
         
         # Compute the log-likelihood
         log_likelihood += np.log(prob[action])
-         
-        # Update the Q-values - feedback sensitive prediction error.
-        prediction_error = (beta * reward) - q[state, action] 
-        q[state, action] += learning_rate * prediction_error
-         
+        # Update the Q-values - Feedback sensitive prediction error.
+        q[state, action] = q_update(q, state, action, reward)
     return -log_likelihood
 
+def model_1_q_update_rule(learning_rate, beta):
+    """
+    learning_rate: float
+        The learning rate
+    beta: float
+        The feedback sensitivity
+    """
+    def update_rule(q, state, action, reward):
+        """
+        q: np.ndarray
+            The Q-values
+        state: int
+            The current state
+        action: int
+            The current action
+        reward: int
+            The reward
+        """
+        prediction_error = (beta * reward) - q[state, action] 
+        return q[state, action] + learning_rate * prediction_error
+    
+    return update_rule
+
+"""
+ Model-1 Assumes that:
+    * \epsilon - learning rate
+    * \beta - feedback sensitivity
+        * $-\rho_{pun} = \rho_{rew} = \beta$
+    * No bias parameters
+        * bias_{app} = bias_{wth} = 0
+"""
+def model_1(data, learning_rate, beta):
+    """
+    data: pd.DataFrame
+        The data of one subject
+    learning_rate: float
+        The learning rate parameter
+    beta: float
+        The feedback sensitivity parameter
+    """
+    update_rule = model_1_q_update_rule(learning_rate, beta)
+    return model_log_likelihood(data, update_rule) 
+#%%
 """
 Model-2: Assumes that:
     * \epsilon - learning rate
@@ -250,7 +283,7 @@ Model-6: Assumes that:
 
 """
 Model-7: Assumes that:
-    * \epsilon_{app}, \epsilon_{wth} - learning rates
+    * \epsilon_{rew}, \epsilon_{pun}, \epsilon_{omit} - learning rates
     * \rho_rew, \rho_pun - feedback sensitivity
     * bias_{app}, bias_{wth} - biases:
 """
