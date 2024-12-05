@@ -163,6 +163,7 @@ def empty_q(num_cues, num_actions):
 
 #%%
 first_subject_df = subject_df(df, 0)
+
 #%%
 def model_log_likelihood(data, q_update):
     """
@@ -198,29 +199,6 @@ def model_log_likelihood(data, q_update):
         q[state, action] = q_update(q, state, action, reward)
     return -log_likelihood
 
-def model_1_q_update_rule(learning_rate, beta):
-    """
-    learning_rate: float
-        The learning rate
-    beta: float
-        The feedback sensitivity
-    """
-    def update_rule(q, state, action, reward):
-        """
-        q: np.ndarray
-            The Q-values
-        state: int
-            The current state
-        action: int
-            The current action
-        reward: int
-            The reward
-        """
-        prediction_error = (beta * reward) - q[state, action] 
-        return q[state, action] + learning_rate * prediction_error
-    
-    return update_rule
-
 """
  Model-1 Assumes that:
     * \epsilon - learning rate
@@ -238,8 +216,22 @@ def model_1(data, learning_rate, beta):
     beta: float
         The feedback sensitivity parameter
     """
-    update_rule = model_1_q_update_rule(learning_rate, beta)
+    def update_rule(q, state, action, reward):
+        """
+        q: np.ndarray
+            The Q-values
+        state: int
+            The current state
+        action: int
+            The current action
+        reward: int
+            The reward
+        """
+        prediction_error = (beta * reward) - q[state, action] 
+        return q[state, action] + learning_rate * prediction_error
+    
     return model_log_likelihood(data, update_rule) 
+
 #%%
 """
 Model-2: Assumes that:
@@ -249,6 +241,36 @@ Model-2: Assumes that:
     * No bias parameters
         * bias_{app} = bias_{wth} = 0 
 """
+def model_2(data, learning_rate, rho_rew, rho_pun):
+    """
+    data: pd.DataFrame
+        The data of one subject
+    learning_rate: float
+        The learning rate parameter
+    rho_rew: float
+        The reward sensitivity parameter
+    rho_pun: float
+        The punishment sensitivity parameter
+    """
+    def update_rule(q, state, action, reward):
+        """
+        q: np.ndarray
+            The Q-values
+        state: int
+            The current state
+        action: int
+            The current action
+        reward: int
+            The reward
+        """
+        if reward == 1:
+            prediction_error = (rho_rew * reward) - q[state, action]
+        elif reward == -1:
+            prediction_error = (rho_pun * reward) - q[state, action]
+        # TODO: How to handle omissions
+        return q[state, action] + learning_rate * prediction_error
+    
+    return model_log_likelihood(data, update_rule)
 
 """
 Model-3: Assumes that:
