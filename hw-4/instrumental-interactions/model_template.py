@@ -400,12 +400,12 @@ INITIAL_PARAMS = {
 
 MODELS = {
     'model_1': model_1,
-    'model_2': model_2,
-    'model_3': model_3,
-    'model_4': model_4,
-    ##'model_5': model_5,
-    ##'model_6': model_6,
-    ##'model_7': model_7
+    # 'model_2': model_2,
+    # 'model_3': model_3,
+    # 'model_4': model_4,
+    #'model_5': model_5,
+    #'model_6': model_6,
+    #'model_7': model_7
 }
 #%%
 """
@@ -445,18 +445,19 @@ def fit_subject(subject_id, model_id, df, model, method='Nelder-Mead'):
     #np.save(f'{subject_id}, {model_id}, log_likelihoods_model_{j}_subject_{i}', res.x)
     # save the fitted parameters
     return subject_id, model_id, res.fun, res.x, num_params, num_trials
+
 #%%
 # Pick one model to start with
-for j, learner in enumerate([model_1]): 
+def fit_model(df, model, model_id, method='Nelder-Mead'):
+    #for j, learner in enumerate([model_1]): 
     # Loop over all subjects
     subjects = np.unique(df.ID)
     # Parallel processing with Joblib
-    model_id = "model_%d" % (j+1)
+    # model_id = "model_%d" % (j+1)
     # subject_data = subject_data.reset_index(drop=True)  # not resetting the index can lead to issues
-     
-    results = Parallel(n_jobs=-1)(delayed(fit_subject)(subject_id, model_id , df, learner) for subject_id in range(len(subjects)))
+    results = Parallel(n_jobs=-1)(delayed(fit_subject)(subject_id, model_id , df, model) for subject_id in range(len(subjects)))
 
-    # Save or process results
+    # Collect the results 
     subject_bics = []
     log_likelihoods = []
     for subject_index, model_id, negative_log_likelihood, params, num_params, trial_count in results:
@@ -464,78 +465,38 @@ for j, learner in enumerate([model_1]):
         BIC(trial_count, num_params, negative_log_likelihood)
         subject_bics.append(BIC(trial_count, num_params, -negative_log_likelihood))
         log_likelihoods.append(-negative_log_likelihood)
-        
-    print(f'Model {j+1} BIC: {np.sum(subject_bics)}')
-    print(f'Model {j+1} Log-Likelihood: {np.sum(log_likelihoods)}')  
-       
-        # save the optimized log-likelihood
-        #np.save(f'log_likelihoods_model_{j}_subject_{i}', res.fun)
-
-        # save the fitted parameters
 
     # compute BIC
-
-
-#%%
-# Pick one model to start with
-for j, learner in enumerate([model_1]): 
-    # Loop over all subjects
-    negative_log_likelihoods= []
-    params = []
-    trail_counts = []
-    for i, subject in enumerate(np.unique(df.ID)):
-        subject_data = subject_df(df, i) # subset data to one subject
-        i, negative_log_likelihood, found_params = fit_subject(i, j, df, learner, method='Nelder-Mead')
-        negative_log_likelihoods.append(negative_log_likelihood)
-        params.append(found_params)
-        trail_counts.append(num_trials(subject_data))
-        """
-        subject_data = subject_df(df, i) # subset data to one subject
-        subject_data = subject_data.reset_index(drop=True)  # not resetting the index can lead to issues
-        print(f'Fitting model {j+1} to subject {i+1}')
+    model_bic = np.sum(subject_bics)
+    model_log_likelihood = np.sum(log_likelihoods)
+    print(f'Model [{model_id}] BIC: {model_bic}')
+    print(f'Model [{model_id}] Log-Likelihood: {model_log_likelihood}')  
+    return model_id, model_log_likelihood, model_bic  
         
-        if j == 0: # for first model
-
-            # define yourself a loss for the current model
-            def loss(params):
-                return model_1(subject_data, *params)
-            model_id = "model_%d" % (j+1)
-            initial_params = [INITIAL_PARAMS[model_id][p] for p in PARAMS[model_id]]
-            bounds = [BOUNDS[model_id][p] for p in PARAMS[model_id]]
-            res = minimize(loss, initial_params, bounds=bounds, method=method, 
-                           tol=1e-2,
-                           options={'disp': True })
-            print(res)
-            print(res.x)    
-            print(res.fun)
-            np.save(f'log_likelihoods_model_{j}_subject_{i}', res.x)
-            # save the optimized log-likelihood
-            #np.save(f'log_likelihoods_model_{j}_subject_{i}', res.fun)
-
-            # save the fitted parameters
-        """
-        
-    # compute BIC
-    BICs = [BIC(n, params, log_likelihood) for n, params, log_likelihood in zip(trail_counts, params, negative_log_likelihoods)]
-    print(BICs)
-    model_bic = np.sum(BICs) 
-    print(f'Model {j+1} BIC: {model_bic}')
-    n = num_trials(df)
-    
+def fit_models(df, models, method='Nelder-Mead'):
+    model_results = Parallel(n_jobs=-1)(delayed(fit_model)(df, model, model_id, method) for model_id, model in models.items())
+    for model_id, model in models.items():
+        fit_model(df, model, model_id, method)
 
 #%%
 """
-
 - Sum up the optimized log-likelihoods across all subjects for each model ?
 
 - Use this and all other relevant values to compute the BIC score for each model ?
   (using e.g. the BIC equation of Wikipedia). 
   
 - What does this tell you about which model describes the data best ?
-
 """
+def plot_log_likelihoods(models, log_likelihoods, save_path='log_likelihoods.png'):
+    plt.figure(figsize=(10, 5))
+    plt.bar(models, log_likelihoods)
+    plt.ylabel('Log-Likelihood')
+    plt.title('Log-Likelihood for each Model')
+    plt.savefig(save_path)
+    plt.show()
 
 
+#%%
 
 """
 for the last model:
