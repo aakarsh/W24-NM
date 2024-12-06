@@ -500,6 +500,12 @@ BOUNDS = {
         'learning_rate_omit': (0, 1),
         'beta': (0, 100)
     },
+    'model_4': {
+        'learning_rate': (0, 1),
+        'beta': (0, 100),
+        'bias_app': (-10, 10),
+        'bias_wth': (-10, 10)
+    }
 } 
 
 INITIAL_PARAMS = {
@@ -517,6 +523,12 @@ INITIAL_PARAMS = {
         'learning_rate_pun': 0.1,
         'learning_rate_omit': 0.1,
         'beta': 0.5
+    }, 
+    'model_4': {
+        'learning_rate': 0.1,
+        'beta': 0.5,
+        'bias_app': 0.5,
+        'bias_wth': 0.5
     }
 }
 
@@ -524,7 +536,7 @@ MODELS = {
     'model_1': model_1,
     'model_2': model_2,
     'model_3': model_3,
-    # 'model_4': model_4,
+    'model_4': model_4,
     #'model_5': model_5,
     #'model_6': model_6,
     #'model_7': model_7
