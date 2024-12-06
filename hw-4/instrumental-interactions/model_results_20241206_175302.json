@@ -1,0 +1,8 @@
+[
+    {
+        "model_id": "model_1",
+        "model_log_likelihood": 660.6284133414438,
+        "model_bic": -1295.669108062023,
+        "subject_results": [
+            {
+                "subject_id": 
