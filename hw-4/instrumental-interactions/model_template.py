@@ -246,6 +246,7 @@ def model_1(data, learning_rate, beta):
         """
         prediction_error = (beta * reward) - q[state, action] 
         return q[state, action] + learning_rate * prediction_error
+    
     return model_negative_log_likelihood(data, update_rule) 
 
 #%%
@@ -301,6 +302,7 @@ Model Number: 3
 Parameters: \epsilon_{rew}, \epsilon_{pun}, \epsilon_{omm}, \beta
 Expected BIC: 4665
 """
+# learning_rate_rew', 'learning_rate_pun', 'learning_rate_omit', 'beta'
 def model_3(data, learning_rate_rew, learning_rate_pun, learning_rate_omm, beta):
     """
     """
@@ -315,15 +317,16 @@ def model_3(data, learning_rate_rew, learning_rate_pun, learning_rate_omm, beta)
         reward: int
             The reward
         """
-        if reward == 1:
-            prediction_error = (beta * reward) - q[state, action]
-            return q[state, action] + learning_rate_rew * prediction_error
-        elif reward == -1:
-            prediction_error = (beta * reward) - q[state, action]
-            return q[state, action] + learning_rate_pun * prediction_error
-        elif reward == 0: # Omission
-            prediction_error = 0 - q[state, action]
-            return q[state, action] + learning_rate_omm * prediction_error
+        # Create an array of learning rates corresponding to reward values
+        learning_rates = np.array([learning_rate_pun, learning_rate_omm, learning_rate_rew])
+        # Map reward values to indices: -1 -> 0, 0 -> 1, 1 -> 2
+        reward_index = reward + 1
+        # Select the appropriate learning rate
+        learning_rate = learning_rates[reward_index]
+        # Calculate the prediction error
+        prediction_error = (beta * reward) - q[state, action]
+        # Update the Q-value
+        return q[state, action] + learning_rate * prediction_error
         
     return model_negative_log_likelihood(data, update_rule)  
 
@@ -357,7 +360,7 @@ def create_bias_matrix(num_states, num_actions, bias_app, bias_wth):
 
 def model_4(data, learning_rate, beta, bias_app, bias_wth):
     """
-     
+    Model-4 includes biases.
     """
     def q_bias(q, state, action, reward):   
         # Each of the 4 cue states Go+, Go-, NoGo+, NoGo-
@@ -438,6 +441,7 @@ def model_5(data, learning_rate, rho_rew, rho_pun, bias_app, bias_wth):
         return q[state, action] + learning_rate * prediction_error + bias_app - bias_wth
     
     return model_negative_log_likelihood(data, update_rule)
+
 """
 Model-6: Assumes that:
     * \epsilon -  learning rate
@@ -482,8 +486,6 @@ PARAMS = {
     'model_7': ['learning_rate_rew', 'learning_rate_pun', 'learning_rate_omit', 'rho_rew', 'rho_pun', 'bias_app', 'bias_wth']
 }
 
-
-
 BOUNDS = {
     'model_1': {
         'learning_rate': (0, 1), 
@@ -506,7 +508,7 @@ BOUNDS = {
         'bias_app': (-10, 10),
         'bias_wth': (-10, 10)
     }
-} 
+}
 
 INITIAL_PARAMS = {
     'model_1': {
@@ -541,6 +543,7 @@ MODELS = {
     #'model_6': model_6,
     #'model_7': model_7
 }
+
 #%%
 """
 Optimize the models: 
@@ -607,7 +610,7 @@ def fit_model(df, model, model_id, method='Nelder-Mead', use_cache=True):
         model_id = subject_result['model_id']
         negative_log_likelihood = subject_result['negative_log_likelihood']
         params = subject_result['params']
-        print(f"subject {subject_id}: params = {params}, negative-log-likelihood = {negative_log_likelihood}")
+        print(f"model {model_id} subject {subject_id}: params = {params}, negative-log-likelihood = {negative_log_likelihood}")
                 
     # compute BIC
     subject_bics = [BIC(r["num_trials"], r["num_params"], r["negative_log_likelihood"]) for r in subject_results]
@@ -669,13 +672,20 @@ assert np.isclose(model_results['model_1']['model_neg_log_likelihood'] , 3248.52
 - What does this tell you about which model describes the data best ?
 """
 def load_model_results(file_path='model_results.pkl'):
+    """
+    Load model results from pkl file.
+    """
     with open(file_path, 'rb') as f:
         model_results = pickle.load(f)
     return model_results
 
 model_results = load_model_results()
 
-def plot_log_likelihoods(models, log_likelihoods, save_path='log_likelihoods.png'):
+def plot_log_likelihoods(models, log_likelihoods, 
+                         save_path='log_likelihoods.png'):
+    """
+    Plot the log-likelihoods for each model.
+    """
     plt.figure(figsize=(10, 5))
     plt.bar(models, log_likelihoods)
     plt.ylabel('Negative Log-Likelihood')
@@ -684,6 +694,9 @@ def plot_log_likelihoods(models, log_likelihoods, save_path='log_likelihoods.png
     plt.show()
 
 def plot_bics(models, bics, save_path='bics.png'):
+    """
+    Plot the BICs for each model.
+    """
     plt.figure(figsize=(10, 5))
     plt.bar(models, bics)
     plt.ylabel('BIC')
@@ -693,8 +706,9 @@ def plot_bics(models, bics, save_path='bics.png'):
 
 # Plot the log-likelihoods and BICs
 models = list(model_results.keys())
-log_likelihoods = [-model_results[model_id]['model_neg_log_likelihood'] for model_id in models]
-bics = [model_results[model_id]['model_bic'] for model_id in models]
+log_likelihoods = [ -model_results[model_id]['model_neg_log_likelihood'] for model_id in models ]
+bics = [ model_results[model_id]['model_bic'] for model_id in models ]
+
 plot_log_likelihoods(models, log_likelihoods)
 plot_bics(models, bics)
 
