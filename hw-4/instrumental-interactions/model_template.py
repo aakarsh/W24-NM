@@ -1,7 +1,7 @@
+#%%
 """
     Example structure for fitting multiple models, feel free to modify to your liking
 """
-#%%
 from numba import njit
 import seaborn as sns
 import pandas as pd
@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 import multiprocessing as mp
+from joblib import Parallel, delayed
 
 sns.set_theme(style='white', context='notebook', font_scale=1.2)
 #%%
@@ -165,7 +166,7 @@ def empty_q(num_cues, num_actions):
 first_subject_df = subject_df(df, 0)
 
 #%%
-def model_log_likelihood(data, q_update):
+def model_negative_log_likelihood(data, q_update):
     """
     data: pd.DataFrame
         The data of one subject
@@ -233,7 +234,7 @@ def model_1(data, learning_rate, beta):
         """
         prediction_error = (beta * reward) - q[state, action] 
         return q[state, action] + learning_rate * prediction_error
-    return model_log_likelihood(data, update_rule) 
+    return model_negative_log_likelihood(data, update_rule) 
 
 #%%
 """
@@ -274,7 +275,7 @@ def model_2(data, learning_rate, rho_rew, rho_pun):
         # TODO: How to handle omissions
         return q[state, action] + learning_rate * prediction_error
     
-    return model_log_likelihood(data, update_rule)
+    return model_negative_log_likelihood(data, update_rule)
 
 """
 Model-3: Assumes that:
@@ -304,7 +305,7 @@ def model_3(data, learning_rate_rew, learning_rate_pun, beta):
             prediction_error = (beta * reward) - q[state, action]
             return q[state, action] + learning_rate_pun * prediction_error
         
-    return model_log_likelihood(data, update_rule)  
+    return model_negative_log_likelihood(data, update_rule)  
 
 """
 Model-4: Assumes that:
@@ -331,7 +332,7 @@ def model_4(data, learning_rate, beta, bias_app, bias_wth):
         
         return False #q[state, action] + learning_rate * prediction_error + bias_app - bias_wth
     
-    return model_log_likelihood(data, update_rule)
+    return model_negative_log_likelihood(data, update_rule)
 """
 Model-5: Assumes that:
     * \epsilon - learning rate
@@ -361,8 +362,16 @@ method = 'Nelder-Mead'
 # but feel free to try others as well, they might be faster.
 
 # define a function to compute the BIC
-def BIC(...):
-    return ...
+def BIC(n, k, log_likelihood):
+    """
+    n: int
+        The number of trials
+    k: int
+        The number of parameters
+    log_likelihood: float   
+        The log-likelihood of the model
+    """
+    return k * np.log(n) - 2 * log_likelihood
 
 #%%
 PARAMS = {
@@ -419,7 +428,7 @@ def fit_subject(subject_id, model_id, df, model, method='Nelder-Mead'):
     model_id = "model_%d" % (j+1)
     subject_data = subject_df(df, subject_id) # subset data to one subject
     subject_data = subject_data.reset_index(drop=True)  # not resetting the index can lead to issues
-    print(f'Fitting model {j+1} to subject {i+1}')
+    print(f'Fitting model {model_id} to subject {subject_id}')
 
     # define yourself a loss for the current model
     def loss(params):
@@ -428,29 +437,37 @@ def fit_subject(subject_id, model_id, df, model, method='Nelder-Mead'):
     initial_params = [INITIAL_PARAMS[model_id][p] for p in PARAMS[model_id]]
     bounds = [BOUNDS[model_id][p] for p in PARAMS[model_id]]
     res = minimize(loss, initial_params, bounds=bounds, method=method, 
-                    tol=1e-2,
+                    tol=1e-6,
                     options={'disp': True })
-    print(res)
-    print(res.x)    
-    print(res.fun)
-    np.save(f'log_likelihoods_model_{j}_subject_{i}', res.x)
-    # save the optimized log-likelihood
-        #np.save(f'log_likelihoods_model_{j}_subject_{i}', res.fun)
 
-        # save the fitted parameters
-    return subject_id, res.fun, res.x
+    num_params = len(res.x)
+    num_trials = len(subject_data)
+    #np.save(f'{subject_id}, {model_id}, log_likelihoods_model_{j}_subject_{i}', res.x)
+    # save the fitted parameters
+    return subject_id, model_id, res.fun, res.x, num_params, num_trials
 #%%
 # Pick one model to start with
 for j, learner in enumerate([model_1]): 
     # Loop over all subjects
     subjects = np.unique(df.ID)
-    # Use multiprocessing Pool
-    with mp.Pool(mp.cpu_count()) as pool:
-        results = pool.map(fit_subject, range(len(subjects)))
-    # Save results collectively if needed
-    for subject_index, params, log_likelihood in results:
-        print(f"Subject {subject_index+1}: Params = {params}, Log-Likelihood = {log_likelihood}")
+    # Parallel processing with Joblib
+    model_id = "model_%d" % (j+1)
+    # subject_data = subject_data.reset_index(drop=True)  # not resetting the index can lead to issues
+     
+    results = Parallel(n_jobs=-1)(delayed(fit_subject)(subject_id, model_id , df, learner) for subject_id in range(len(subjects)))
+
+    # Save or process results
+    subject_bics = []
+    log_likelihoods = []
+    for subject_index, model_id, negative_log_likelihood, params, num_params, trial_count in results:
+        print(f"Subject {subject_index+1}: Params = {params}, Negative-Log-Likelihood = {negative_log_likelihood}")
+        BIC(trial_count, num_params, negative_log_likelihood)
+        subject_bics.append(BIC(trial_count, num_params, -negative_log_likelihood))
+        log_likelihoods.append(-negative_log_likelihood)
         
+    print(f'Model {j+1} BIC: {np.sum(subject_bics)}')
+    print(f'Model {j+1} Log-Likelihood: {np.sum(log_likelihoods)}')  
+       
         # save the optimized log-likelihood
         #np.save(f'log_likelihoods_model_{j}_subject_{i}', res.fun)
 
@@ -463,7 +480,16 @@ for j, learner in enumerate([model_1]):
 # Pick one model to start with
 for j, learner in enumerate([model_1]): 
     # Loop over all subjects
+    negative_log_likelihoods= []
+    params = []
+    trail_counts = []
     for i, subject in enumerate(np.unique(df.ID)):
+        subject_data = subject_df(df, i) # subset data to one subject
+        i, negative_log_likelihood, found_params = fit_subject(i, j, df, learner, method='Nelder-Mead')
+        negative_log_likelihoods.append(negative_log_likelihood)
+        params.append(found_params)
+        trail_counts.append(num_trials(subject_data))
+        """
         subject_data = subject_df(df, i) # subset data to one subject
         subject_data = subject_data.reset_index(drop=True)  # not resetting the index can lead to issues
         print(f'Fitting model {j+1} to subject {i+1}')
@@ -487,8 +513,15 @@ for j, learner in enumerate([model_1]):
             #np.save(f'log_likelihoods_model_{j}_subject_{i}', res.fun)
 
             # save the fitted parameters
-
+        """
+        
     # compute BIC
+    BICs = [BIC(n, params, log_likelihood) for n, params, log_likelihood in zip(trail_counts, params, negative_log_likelihoods)]
+    print(BICs)
+    model_bic = np.sum(BICs) 
+    print(f'Model {j+1} BIC: {model_bic}')
+    n = num_trials(df)
+    
 
 #%%
 """
