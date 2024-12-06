@@ -244,6 +244,10 @@ Model-2: Assumes that:
         * \rho_pun != \rho_rew - (separate reward and punishment sensitivities) 
     * No bias parameters
         * bias_{app} = bias_{wth} = 0 
+        
+* Model Number: 2
+* Parameters: \epsilon, \rho_{rew}, \rho_{pun}
+* BIC: 4613
 """
 def model_2(data, learning_rate, rho_rew, rho_pun):
     """
@@ -272,9 +276,11 @@ def model_2(data, learning_rate, rho_rew, rho_pun):
             prediction_error = (rho_rew * reward) - q[state, action]
         elif reward == -1:
             prediction_error = (rho_pun * reward) - q[state, action]
-        # TODO: How to handle omissions
+        elif reward == 0: # Omission
+            prediction_error = 0 - q[state, action]
+        else:
+            raise ValueError(f'Invalid reward value: {reward}')
         return q[state, action] + learning_rate * prediction_error
-    
     return model_negative_log_likelihood(data, update_rule)
 
 """
@@ -283,8 +289,12 @@ Model-3: Assumes that:
     * \beta - feedback sensitivity
     * No bias parameters
         * bias_{app} = bias_{wth} = 0
+        
+Model Number: 3
+Parameters: \epsilon_{rew}, \epsilon_{pun}, \epsilon_{omm}, \beta
+Expected BIC: 4665
 """
-def model_3(data, learning_rate_rew, learning_rate_pun, beta):
+def model_3(data, learning_rate_rew, learning_rate_pun, learning_rate_omm, beta):
     """
     """
     def update_rule(q, state, action, reward):
@@ -304,6 +314,9 @@ def model_3(data, learning_rate_rew, learning_rate_pun, beta):
         elif reward == -1:
             prediction_error = (beta * reward) - q[state, action]
             return q[state, action] + learning_rate_pun * prediction_error
+        elif reward == 0: # Omission
+            prediction_error = 0 - q[state, action]
+            return q[state, action] + learning_rate_omm * prediction_error
         
     return model_negative_log_likelihood(data, update_rule)  
 
@@ -313,6 +326,8 @@ Model-4: Assumes that:
     * \beta - feedback sensitivity
     * Biases: 
         * bias_{app} != bias_{wth} - (separate biases to approach and withhold responding)
+Model Number: 4
+Parameters: \epsilon, \beta, bias_{app}, bias_{wth}
 """
 def model_4(data, learning_rate, beta, bias_app, bias_wth):
     """
@@ -339,8 +354,33 @@ Model-5: Assumes that:
     * \rho_pun ,\rho_rew - feedback sensitivity
     * bias_{app}, bias_{wth} - biases: 
         * bias_{app} != bias_{wth} - (separate biases to approach and withhold responding)
+        
+* Model Number: 5
+* Parameters: \epsilon, \rho_{rew}, \rho_{pun}, bias_{app}, bias_{wth}
+* Expected BIC: 4606
 """
+def model_5(data, learning_rate, rho_rew, rho_pun, bias_app, bias_wth):
+    """
 
+    """
+    def update_rule(q, state, action, reward):
+        """
+        q: np.ndarray
+            The Q-values
+        state: int
+            The current state
+        action: int
+            The current action
+        reward: int
+            The reward
+        """
+        if reward == 1:
+            prediction_error = (rho_rew * reward) - q[state, action]
+        elif reward == -1:
+            prediction_error = (rho_pun * reward) - q[state, action]
+        return q[state, action] + learning_rate * prediction_error + bias_app - bias_wth
+    
+    return model_negative_log_likelihood(data, update_rule)
 """
 Model-6: Assumes that:
     * \epsilon -  learning rate
@@ -362,6 +402,7 @@ method = 'Nelder-Mead'
 # but feel free to try others as well, they might be faster.
 
 # define a function to compute the BIC
+@njit
 def BIC(n, k, log_likelihood):
     """
     n: int
@@ -403,7 +444,7 @@ MODELS = {
     # 'model_2': model_2,
     # 'model_3': model_3,
     # 'model_4': model_4,
-    #'model_5': model_5,
+    'model_5': model_5,
     #'model_6': model_6,
     #'model_7': model_7
 }
@@ -425,7 +466,6 @@ Pay attention to initialize the parameters
         rather than during every iteration of your for-loop
 """
 def fit_subject(subject_id, model_id, df, model, method='Nelder-Mead'):
-    model_id = "model_%d" % (j+1)
     subject_data = subject_df(df, subject_id) # subset data to one subject
     subject_data = subject_data.reset_index(drop=True)  # not resetting the index can lead to issues
     print(f'Fitting model {model_id} to subject {subject_id}')
@@ -449,35 +489,46 @@ def fit_subject(subject_id, model_id, df, model, method='Nelder-Mead'):
 #%%
 # Pick one model to start with
 def fit_model(df, model, model_id, method='Nelder-Mead'):
-    #for j, learner in enumerate([model_1]): 
     # Loop over all subjects
-    subjects = np.unique(df.ID)
+    subject_ids = np.sort(np.unique(df.ID))
     # Parallel processing with Joblib
-    # model_id = "model_%d" % (j+1)
     # subject_data = subject_data.reset_index(drop=True)  # not resetting the index can lead to issues
-    results = Parallel(n_jobs=-1)(delayed(fit_subject)(subject_id, model_id , df, model) for subject_id in range(len(subjects)))
+    results = Parallel(n_jobs=-1)(delayed(fit_subject)(subject_id, model_id , df, model) for subject_id in subject_ids)
 
     # Collect the results 
     subject_bics = []
     log_likelihoods = []
     for subject_index, model_id, negative_log_likelihood, params, num_params, trial_count in results:
-        print(f"Subject {subject_index+1}: Params = {params}, Negative-Log-Likelihood = {negative_log_likelihood}")
-        BIC(trial_count, num_params, negative_log_likelihood)
+        print(f"subject {subject_index+1}: params = {params}, negative-log-likelihood = {negative_log_likelihood}")
         subject_bics.append(BIC(trial_count, num_params, -negative_log_likelihood))
         log_likelihoods.append(-negative_log_likelihood)
-
+        
     # compute BIC
     model_bic = np.sum(subject_bics)
     model_log_likelihood = np.sum(log_likelihoods)
-    print(f'Model [{model_id}] BIC: {model_bic}')
-    print(f'Model [{model_id}] Log-Likelihood: {model_log_likelihood}')  
+
     return model_id, model_log_likelihood, model_bic  
         
 def fit_models(df, models, method='Nelder-Mead'):
     model_results = Parallel(n_jobs=-1)(delayed(fit_model)(df, model, model_id, method) for model_id, model in models.items())
-    for model_id, model in models.items():
-        fit_model(df, model, model_id, method)
+    
+    # Collect model results
+    model_results_map = {model_id: { 'log_likelihood': log_likelihood, 'bic': bic} 
+                            for model_id, log_likelihood, bic in model_results }
+    
+    for model_id, log_likelihood, bic in model_results:
+        print(f'Model [{model_id}] Log-Likelihood: {log_likelihood}')
+        print(f'Model [{model_id}] BIC: {bic}')
+        
+    return model_results_map
 
+#%%
+model_results = fit_models(df, MODELS, method='Nelder-Mead')
+
+assert len(model_results) == len(MODELS)
+
+assert np.isclose(model_results['model_1']['log_likelihood'] , -3248.52)
+assert np.isclose(model_results['model_1']['bic'] , 6624.98)
 #%%
 """
 - Sum up the optimized log-likelihoods across all subjects for each model ?
@@ -490,14 +541,27 @@ def fit_models(df, models, method='Nelder-Mead'):
 def plot_log_likelihoods(models, log_likelihoods, save_path='log_likelihoods.png'):
     plt.figure(figsize=(10, 5))
     plt.bar(models, log_likelihoods)
-    plt.ylabel('Log-Likelihood')
-    plt.title('Log-Likelihood for each Model')
+    plt.ylabel('Negative Log-Likelihood')
+    plt.title('Negative Log-Likelihood for each Model')
     plt.savefig(save_path)
     plt.show()
 
+def plot_bics(models, bics, save_path='bics.png'):
+    plt.figure(figsize=(10, 5))
+    plt.bar(models, bics)
+    plt.ylabel('BIC')
+    plt.title('BIC for each Model')
+    plt.savefig(save_path)
+    plt.show()
+
+# Plot the log-likelihoods and BICs
+models = list(model_results.keys())
+log_likelihoods = [-model_results[model_id]['log_likelihood'] for model_id in models]
+bics = [model_results[model_id]['bic'] for model_id in models]
+plot_log_likelihoods(models, log_likelihoods)
+plot_bics(models, bics)
 
 #%%
-
 """
 for the last model:
     - compare the fitted :
