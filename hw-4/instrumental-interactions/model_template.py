@@ -291,7 +291,6 @@ def model_2(data, learning_rate, rho_rew, rho_pun):
         """
         scaling_factor = (reward == 1) * rho_rew + (reward == -1) * rho_pun
         prediction_error = (scaling_factor * reward) - q[state, action]
-
         return q[state, action] + (learning_rate * prediction_error)
     return model_negative_log_likelihood(data, update_rule)
 
@@ -350,17 +349,6 @@ Model Number: 4
 Parameters: \epsilon, \beta, bias_{app}, bias_{wth}
 Expected BIC: 4771
 """
-# Each of the 4 cue states Go+, Go-, NoGo+, NoGo-
-# Can be optionally associated with a bias
-# b(a_t) takes value 
-#   b_{app} for approach go actions     Go+ - 
-#   b_{wth} for withdrawal go actions   Go- 
-#   0 for NoGo+
-#   0 for NoGo-
-# 4 states : Go+, Go-, NoGo+, NoGo-
-# 2 actions: 1, 0
-# 4 biases: Go+: bias_{app}, Go-, bias_{wth}, 0, 0
-# Determine the appropriate bias based on state (context) and action
 def model_4(data, learning_rate, beta, bias_app, bias_wth):
     """
     Model-4 includes biases.
@@ -405,13 +393,14 @@ def model_5(data, learning_rate, rho_rew, rho_pun, bias_app, bias_wth):
     """
 
     """
-    def q_bias(q, state,action, reward):
-        if state == 0:
-            return bias_app 
-        elif state == 1:
-            return bias_wth
-        else:
-            return 0
+    def q_bias(q, state):   
+        bias_matrix = np.array([
+            [0.0, bias_app],  # Go+ (state 0): NoGo = 0, Go = bias_app
+            [0.0, bias_wth],  # Go- (state 1): NoGo = 0, Go = bias_wth
+            [0.0, 0.0],       # NoGo+ (state 2): No bias for either action
+            [0.0, 0.0]        # NoGo- (state 3): No bias for either action
+        ])
+        return q[state] + bias_matrix[state] 
         
     def update_rule(q, state, action, reward):
         """
@@ -424,13 +413,12 @@ def model_5(data, learning_rate, rho_rew, rho_pun, bias_app, bias_wth):
         reward: int
             The reward
         """
-        if reward == 1:
-            prediction_error = (rho_rew * reward) - q[state, action]
-        elif reward == -1:
-            prediction_error = (rho_pun * reward) - q[state, action]
-        return q[state, action] + learning_rate * prediction_error + bias_app - bias_wth
+        scaling_factor = (reward == 1) * rho_rew + (reward == -1) * rho_pun
+        prediction_error = (scaling_factor * reward) - q[state, action]
+        return q[state, action] + (learning_rate * prediction_error)
+ 
     
-    return model_negative_log_likelihood(data, update_rule)
+    return model_negative_log_likelihood(data, update_rule, q_bias=q_bias)
 
 """
 Model-6: Assumes that:
@@ -497,7 +485,14 @@ BOUNDS = {
         'beta': (0, 100),
         'bias_app': (-10, 10),
         'bias_wth': (-10, 10)
-    }
+    }, 
+    'model_5': {
+        'learning_rate': (0, 1),
+        'rho_rew': (0, 100),
+        'rho_pun': (0, 100),
+        'bias_app': (-10, 10),
+        'bias_wth': (-10, 10)
+    },
 }
 
 INITIAL_PARAMS = {
@@ -521,7 +516,14 @@ INITIAL_PARAMS = {
         'beta': 0.5,
         'bias_app': 0.5,
         'bias_wth': 0.5
-    }
+    }, 
+    'model_5': {
+        'learning_rate': 0.1,
+        'rho_rew': 0.5,
+        'rho_pun': 0.5,
+        'bias_app': 0.5,
+        'bias_wth': 0.5
+    },
 }
 
 MODELS = {
@@ -529,7 +531,7 @@ MODELS = {
     'model_2': model_2,
     'model_3': model_3,
     'model_4': model_4,
-    #'model_5': model_5,
+    'model_5': model_5,
     #'model_6': model_6,
     #'model_7': model_7
 }
