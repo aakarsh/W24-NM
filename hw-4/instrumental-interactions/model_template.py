@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
+import multiprocessing as mp
 
 sns.set_theme(style='white', context='notebook', font_scale=1.2)
 #%%
@@ -196,8 +197,10 @@ def model_log_likelihood(data, q_update):
         log_likelihood += np.log(prob[action])
         # Update the Q-values - Feedback sensitive prediction error.
         q[state, action] = q_update(q, state, action, reward)
+        
     return -log_likelihood
 
+#%%
 """
  Model-1 Assumes that:
     * \epsilon - learning rate
@@ -206,6 +209,7 @@ def model_log_likelihood(data, q_update):
     * No bias parameters
         * bias_{app} = bias_{wth} = 0
 """
+
 def model_1(data, learning_rate, beta):
     """
     data: pd.DataFrame
@@ -215,6 +219,7 @@ def model_1(data, learning_rate, beta):
     beta: float
         The feedback sensitivity parameter
     """
+    @njit
     def update_rule(q, state, action, reward):
         """
         q: np.ndarray
@@ -250,6 +255,7 @@ def model_2(data, learning_rate, rho_rew, rho_pun):
     rho_pun: float
         The punishment sensitivity parameter
     """
+    @njit
     def update_rule(q, state, action, reward):
         """
         q: np.ndarray
@@ -350,6 +356,7 @@ Model-7: Assumes that:
 
 #%%
 method = 'Nelder-Mead'  
+#%%
 # This optimization should work for the given data, 
 # but feel free to try others as well, they might be faster.
 
@@ -357,9 +364,44 @@ method = 'Nelder-Mead'
 def BIC(...):
     return ...
 
+#%%
+PARAMS = {
+    'model_1': ['learning_rate', 'beta'],
+    'model_2': ['learning_rate', 'rho_rew', 'rho_pun'],
+    'model_3': ['learning_rate_rew', 'learning_rate_pun', 'beta'],
+    'model_4': ['learning_rate', 'beta', 'bias_app', 'bias_wth'],
+    'model_5': ['learning_rate', 'rho_rew', 'rho_pun', 'bias_app', 'bias_wth'],
+    'model_6': ['learning_rate', 'rho_rew_app', 'rho_rew_wth', 'rho_pun_app', 'rho_pun_wth', 'bias_app', 'bias_wth'],
+    'model_7': ['learning_rate_rew', 'learning_rate_pun', 'learning_rate_omit', 'rho_rew', 'rho_pun', 'bias_app', 'bias_wth']
+}
+
+BOUNDS = {
+    'model_1': {
+        'learning_rate': (0, 1),
+        'beta': (0, 1)
+    }
+} 
+
+INITIAL_PARAMS = {
+    'model_1': {
+        'learning_rate': 0.1,
+        'beta': 0.5
+    },
+}
+
+MODELS = {
+    'model_1': model_1,
+    'model_2': model_2,
+    'model_3': model_3,
+    'model_4': model_4,
+    ##'model_5': model_5,
+    ##'model_6': model_6,
+    ##'model_7': model_7
+}
+#%%
 """
 Optimize the models: 
-    -fitting all the parameters of each model to each individual subject, 
+    - fitting all the parameters of each model to each individual subject, 
     - using the scipy minimize function. 
 
 Pay attention to initialize the parameters 
@@ -373,26 +415,82 @@ Pay attention to initialize the parameters
         to save time you can e.g.  only apply the logarithm at the end, 
         rather than during every iteration of your for-loop
 """
+def fit_subject(subject_id, model_id, df, model, method='Nelder-Mead'):
+    model_id = "model_%d" % (j+1)
+    subject_data = subject_df(df, subject_id) # subset data to one subject
+    subject_data = subject_data.reset_index(drop=True)  # not resetting the index can lead to issues
+    print(f'Fitting model {j+1} to subject {i+1}')
+
+    # define yourself a loss for the current model
+    def loss(params):
+        return model(subject_data, *params)
+    
+    initial_params = [INITIAL_PARAMS[model_id][p] for p in PARAMS[model_id]]
+    bounds = [BOUNDS[model_id][p] for p in PARAMS[model_id]]
+    res = minimize(loss, initial_params, bounds=bounds, method=method, 
+                    tol=1e-2,
+                    options={'disp': True })
+    print(res)
+    print(res.x)    
+    print(res.fun)
+    np.save(f'log_likelihoods_model_{j}_subject_{i}', res.x)
+    # save the optimized log-likelihood
+        #np.save(f'log_likelihoods_model_{j}_subject_{i}', res.fun)
+
+        # save the fitted parameters
+    return subject_id, res.fun, res.x
 #%%
-for j, learner in enumerate([model_1]):
+# Pick one model to start with
+for j, learner in enumerate([model_1]): 
+    # Loop over all subjects
+    subjects = np.unique(df.ID)
+    # Use multiprocessing Pool
+    with mp.Pool(mp.cpu_count()) as pool:
+        results = pool.map(fit_subject, range(len(subjects)))
+    # Save results collectively if needed
+    for subject_index, params, log_likelihood in results:
+        print(f"Subject {subject_index+1}: Params = {params}, Log-Likelihood = {log_likelihood}")
+        
+        # save the optimized log-likelihood
+        #np.save(f'log_likelihoods_model_{j}_subject_{i}', res.fun)
 
+        # save the fitted parameters
+
+    # compute BIC
+
+
+#%%
+# Pick one model to start with
+for j, learner in enumerate([model_1]): 
+    # Loop over all subjects
     for i, subject in enumerate(np.unique(df.ID)):
-        subject_data = ... # subset data to one subject
+        subject_data = subject_df(df, i) # subset data to one subject
         subject_data = subject_data.reset_index(drop=True)  # not resetting the index can lead to issues
-
-        if j == 0:
+        print(f'Fitting model {j+1} to subject {i+1}')
+        
+        if j == 0: # for first model
 
             # define yourself a loss for the current model
             def loss(params):
-                return ...
-            res = minimize(loss, ...initial_params..., bounds=..., method=method)
-
-            # save the optimized log-likelihhod
+                return model_1(subject_data, *params)
+            model_id = "model_%d" % (j+1)
+            initial_params = [INITIAL_PARAMS[model_id][p] for p in PARAMS[model_id]]
+            bounds = [BOUNDS[model_id][p] for p in PARAMS[model_id]]
+            res = minimize(loss, initial_params, bounds=bounds, method=method, 
+                           tol=1e-2,
+                           options={'disp': True })
+            print(res)
+            print(res.x)    
+            print(res.fun)
+            np.save(f'log_likelihoods_model_{j}_subject_{i}', res.x)
+            # save the optimized log-likelihood
+            #np.save(f'log_likelihoods_model_{j}_subject_{i}', res.fun)
 
             # save the fitted parameters
 
     # compute BIC
 
+#%%
 """
 
 - Sum up the optimized log-likelihoods across all subjects for each model ?
