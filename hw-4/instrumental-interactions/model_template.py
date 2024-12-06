@@ -204,7 +204,7 @@ def model_negative_log_likelihood(data, q_update, q_init=empty_q, q_bias=None):
         if q_bias is None:
             prob = softmax(q[state])
         else:
-            q_biased = q_bias(q, state, action, reward) 
+            q_biased = q_bias(q, state) 
             prob = softmax(q_biased)
        
         # Compute the log-likelihood
@@ -213,6 +213,10 @@ def model_negative_log_likelihood(data, q_update, q_init=empty_q, q_bias=None):
         q[state, action] = q_update(q, state, action, reward)
         
     return -log_likelihood
+
+# num-states: 4 (Go+, Go-, NoGo+, NoGo-)
+# num-actions: 2 (1, 0)
+# q[state] - 2 actions
 
 #%%
 """
@@ -302,7 +306,6 @@ Model Number: 3
 Parameters: \epsilon_{rew}, \epsilon_{pun}, \epsilon_{omm}, \beta
 Expected BIC: 4665
 """
-# learning_rate_rew', 'learning_rate_pun', 'learning_rate_omit', 'beta'
 def model_3(data, learning_rate_rew, learning_rate_pun, learning_rate_omm, beta):
     """
     """
@@ -347,36 +350,30 @@ Model Number: 4
 Parameters: \epsilon, \beta, bias_{app}, bias_{wth}
 Expected BIC: 4771
 """
-def create_bias_matrix(num_states, num_actions, bias_app, bias_wth):
-    bias_matrix = np.zeros((num_states, num_actions))
-    # Apply bias to Go actions in appropriate states
-    # State 0 is Go+, State 1 is Go-
-    bias_matrix[0, 1] = bias_app  # Bias for Go+ (approach)
-    bias_matrix[1, 1] = bias_wth  # Bias for Go- (withdrawal)
-    
-    # No biases for NoGo actions
-    # State 2 (NoGo+) and State 3 (NoGo-) have all biases as 0
-    return bias_matrix
-
+# Each of the 4 cue states Go+, Go-, NoGo+, NoGo-
+# Can be optionally associated with a bias
+# b(a_t) takes value 
+#   b_{app} for approach go actions     Go+ - 
+#   b_{wth} for withdrawal go actions   Go- 
+#   0 for NoGo+
+#   0 for NoGo-
+# 4 states : Go+, Go-, NoGo+, NoGo-
+# 2 actions: 1, 0
+# 4 biases: Go+: bias_{app}, Go-, bias_{wth}, 0, 0
+# Determine the appropriate bias based on state (context) and action
 def model_4(data, learning_rate, beta, bias_app, bias_wth):
     """
     Model-4 includes biases.
     """
-    def q_bias(q, state, action, reward):   
-        # Each of the 4 cue states Go+, Go-, NoGo+, NoGo-
-        # Can be optionally associated with a bias
-        # b(a_t) takes value 
-        #   b_{app} for approach go actions     Go+ - 
-        #   b_{wth} for withdrawal go actions   Go- 
-        #   0 for NoGo+
-        #   0 for NoGo-
-        # 4 states : Go+, Go-, NoGo+, NoGo-
-        # 2 actions: 1, 0
-        # 4 biases: Go+: bias_{app}, Go-, bias_{wth}, 0, 0
-        bias = np.array([bias_app, bias_wth, 0, 0])
-        
-        return q[:, action] + bias
-    
+    def q_bias(q, state):   
+        bias_matrix = np.array([
+            [0.0, bias_app],  # Go+ (state 0): NoGo = 0, Go = bias_app
+            [0.0, bias_wth],  # Go- (state 1): NoGo = 0, Go = bias_wth
+            [0.0, 0.0],       # NoGo+ (state 2): No bias for either action
+            [0.0, 0.0]        # NoGo- (state 3): No bias for either action
+        ])
+        return q[state] + bias_matrix[state] 
+       
     def update_rule(q, state, action, reward):
         """
         q: np.ndarray
@@ -388,18 +385,11 @@ def model_4(data, learning_rate, beta, bias_app, bias_wth):
         reward: int
             The reward
         """
-        # state == 0 and state == 1 are  Go+ and Go- respectively 
-        # state == 2 and state == 3 are NoGo+ and NoGo- respectively
-        # biases are only applied to Go+ and Go- states
-        #  bias_{app} applied to Go+ and bias_{wth} applied to Go-
-        q_value = q[state, action]
-        if state == 0:
-            q_value += bias_app 
+        # Update Q-value with learning rate and prediction error
         prediction_error = (beta * reward) - q[state, action]
-        
-        return False #q[state, action] + learning_rate * prediction_error + bias_app - bias_wth
+        return q[state, action] + (learning_rate * prediction_error)
     
-    return model_negative_log_likelihood(data, update_rule)
+    return model_negative_log_likelihood(data, update_rule, q_bias=q_bias)
 """
 Model-5: Assumes that:
     * \epsilon - learning rate
