@@ -512,6 +512,60 @@ def model_7(data, learning_rate_app, learning_rate_wth, rho_rew, rho_pun, bias_a
     
     return model_negative_log_likelihood(data, update_rule, q_bias=q_bias)
 
+"""
+Model-8: Assumes that:
+    * \epsilon_{rew}, \epsilon_{pun}, \epsilon_{omit} - learning rates
+    * \rho_rew, \rho_pun - feedback sensitivity
+    * bias_{app}, bias_{wth} - biases:
+    * bias_pav - Pavlovian bias
+"""
+def model_8(data, learning_rate_app, learning_rate_wth, rho_rew, rho_pun, bias_app, bias_wth, bias_pav):
+    """
+    """
+    def q_bias(q, state):   
+        bias_matrix = np.array([
+            [0.0, bias_app],  # Go+ (state 0): NoGo = 0, Go = bias_app
+            [0.0, bias_wth],  # Go- (state 1): NoGo = 0, Go = bias_wth
+            [0.0, 0.0],       # NoGo+ (state 2): No bias for either action
+            [0.0, 0.0]        # NoGo- (state 3): No bias for either action
+        ])
+       
+        # Compute the Pavlovian bias term, p'_t(a_t)
+        max_q = np.max(q[state])  
+        pav_bias = np.zeros(2)   
+        if max_q > 0:
+            pav_bias[1] = bias_pav  
+        elif max_q < 0:
+            pav_bias[0] = bias_pav  
+        
+        return q[state] + bias_matrix[state] + pav_bias
+        
+    def update_rule(q, state, action, reward):
+        """
+        q: np.ndarray
+            The Q-values
+        state: int
+            The current state
+        action: int
+            The current action
+        reward: int
+            The reward
+        """
+        # Determine the appropriate learning rate based on state
+        if state in [0, 2]:  # Go+ or NoGo+ (approach conditions)
+            learning_rate = learning_rate_app
+        elif state in [1, 3]:  # Go- or NoGo- (withdrawal conditions)
+            learning_rate = learning_rate_wth
+        else:
+            raise ValueError(f"Unexpected state: {state}")
+
+        rho = (reward == 1) * rho_rew + (reward == -1) * rho_pun
+        # Compute prediction error
+        prediction_error = (rho * reward) - q[state, action]
+        return q[state, action] + (learning_rate * prediction_error)
+    
+    return model_negative_log_likelihood(data, update_rule, q_bias=q_bias)
+
             
 
 #%%
