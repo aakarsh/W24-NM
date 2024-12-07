@@ -905,3 +905,36 @@ for the last model:
 
 
 # Bonus
+#%%
+def plot_nll_and_bic(models, nlls, bics, save_path='nll_and_bic.png'):
+    """
+    Plot Negative Log-Likelihood (NLL) and BIC for each model in one graph.
+    """
+    fig, ax1 = plt.subplots(figsize=(10, 5))
+
+    # Plot NLL on the left y-axis
+    ax1.bar(models, nlls, color='blue', alpha=0.7, label='Negative Log-Likelihood')
+    ax1.set_ylabel('Negative Log-Likelihood', color='blue')
+    ax1.tick_params(axis='y', labelcolor='blue')
+
+    # Plot BIC on the right y-axis
+    ax2 = ax1.twinx()
+    ax2.plot(models, bics, color='orange', marker='o', linestyle='-', label='BIC')
+    ax2.set_ylabel('BIC', color='orange')
+    ax2.tick_params(axis='y', labelcolor='orange')
+
+    # Add titles and legends
+    plt.title('Log-Likelihood and BIC for each Model')
+    fig.tight_layout()
+    fig.legend(loc="upper center", bbox_to_anchor=(0.5, -0.1), shadow=True, ncol=2)
+    plt.savefig(save_path)
+    plt.show()
+
+# Data preparation
+models = list(model_results.keys())
+nlls = [-model_results[model_id]['model_neg_log_likelihood'] for model_id in models]
+bics = [model_results[model_id]['model_bic'] for model_id in models]
+
+# Plot NLL and BIC in a single graph
+plot_nll_and_bic(models, nlls, bics)
+# %%
