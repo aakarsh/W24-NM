@@ -576,7 +576,6 @@ def model_8(data, learning_rate_app, learning_rate_wth, rho_rew, rho_pun, bias_a
     
     return model_negative_log_likelihood(data, update_rule, q_bias=q_bias)
 
-            
 
 #%%
 method = 'Nelder-Mead'  
@@ -768,11 +767,11 @@ def fit_subject(subject_id, model_id, df, model, method='Nelder-Mead',
     opt_initial_params = [initial_params[model_id][p] for p in PARAMS[model_id]]
     opt_bounds = [bounds[model_id][p] for p in PARAMS[model_id]]
     
-    res = minimize(loss, 
-                        opt_initial_params, 
-                        bounds=opt_bounds, 
-                        method=method, 
-                        tol=1e-6, options={'disp': True })
+    res = minimize(loss, opt_initial_params, 
+                            bounds=opt_bounds, 
+                            method=method, 
+                            tol=1e-6, 
+                            options={'disp': True })
 
     num_params = len(res.x)
     num_trials = len(subject_data)
@@ -788,7 +787,8 @@ def fit_subject(subject_id, model_id, df, model, method='Nelder-Mead',
 
 #%%
 # Pick one model to start with
-def fit_model(df, model, model_id, method='Nelder-Mead', use_cache=True):
+def fit_model(df, model, model_id, method='Nelder-Mead', use_cache=True, 
+              initial_params=INITIAL_PARAMS, bounds=BOUNDS):
     
     if os.path.exists(f'{model_id}_model_results.pkl') and use_cache:
         print(f'Loading cached results for model {model_id}')
@@ -800,7 +800,7 @@ def fit_model(df, model, model_id, method='Nelder-Mead', use_cache=True):
     subject_ids = np.sort(np.unique(df.ID))
     # Parallel processing with Joblib
     # subject_data = subject_data.reset_index(drop=True)  # not resetting the index can lead to issues
-    subject_results = Parallel(n_jobs=-1)(delayed(fit_subject)(subject_id, model_id , df, model, method=method) for subject_id in subject_ids)
+    subject_results = Parallel(n_jobs=-1)(delayed(fit_subject)(subject_id, model_id , df, model, method=method, initial_params=initial_params, bounds=bounds) for subject_id in subject_ids)
 
     # Collect the results 
     for subject_result in subject_results:
@@ -1027,5 +1027,42 @@ For the last model:
     - How do you interpret the difference in their means ?
 """
 #%%
-
+def random_initialization_fit_subject(subject_id=0,model_id='model_8', model=model_8, df=df,  n_iter=10):
+    param_list=[]
+    for i in range(n_iter):
+        print(f'Fitting model_8 to subject {subject_id}, iteration {i}')
+        bounds_by_param = [BOUNDS[model_id][p] for p in PARAMS[model_id]]
+        random_initial_params = {model_id: {
+            p: np.random.uniform(*bounds_by_param[idx]) 
+                for idx, p in enumerate(PARAMS[model_id])
+        }}
+        param_list.append(random_initial_params)
+        
+    # model_results_map = fit_subject(subject_id, model_id, df, model, initial_params=param_list[0])
+    model_results_map = Parallel(n_jobs=-1)(delayed(fit_subject)(subject_id, model_id, 
+                                                                 df, model, 
+                                                                 initial_params=initial_params) 
+                                            for _, initial_params in enumerate(param_list))
+    return model_results_map
 #%%
+random_initialization_model_result_map = random_initialization_fit_subject(df=df, n_iter=30)
+#%% Save random intitialziation map to file.
+with open('random_initialization_model_result_map.pkl', 'wb') as f:
+    pickle.dump(random_initialization_model_result_map, f)
+#%%
+found_params = [random_initialization_model_result_map[i]['params'] for i,_ in  enumerate(random_initialization_model_result_map)] 
+bias_app_idx = PARAMS['model_8'].index('bias_app')
+bias_wth_idx = PARAMS['model_8'].index('bias_wth')
+bias_app = [p[bias_app_idx] for p in found_params]
+bias_wth = [p[bias_wth_idx] for p in found_params]
+#% 
+plt.figure(figsize=(10, 10))
+plt.title('Scatter Plot of Bias for Approach and Withhold')
+plt.xlabel('Bias for Approach')
+plt.ylabel('Bias for Withhold')
+bias_app_with_df = pd.DataFrame({'bias_app': bias_app, 'bias_wth': bias_wth})
+sns.scatterplot(data=bias_app_with_df, x='bias_app', y='bias_wth')
+plt.grid(True)  
+plt.savefig('bias_app_with_scatter.png')
+plt.show()
+# %%
