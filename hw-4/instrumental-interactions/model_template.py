@@ -854,7 +854,13 @@ def save_mode_results(model_results):
 #%%
 model_results = fit_models(df, MODELS, method='Nelder-Mead', use_cache=True)
 save_mode_results(model_results)
+#%%
+model_results_df = pd.DataFrame()
 
+for model_id, model_result in model_results.items():
+    model_results_df = pd.concat([model_results_df, pd.DataFrame(model_result)])
+
+model_results_df    
 #%%
 def min_neg_log_likelihood(model_results):
     """
@@ -1044,8 +1050,9 @@ def random_initialization_fit_subject(subject_id=0,model_id='model_8', model=mod
                                                                  initial_params=initial_params) 
                                             for _, initial_params in enumerate(param_list))
     return model_results_map
+
 #%%
-def scatter_plot_bias_approach_bias_with(use_cache=True) :
+def scatter_plot_bias_approach_bias_with(use_cache=True, model_id='model_8'):
     if os.path.exists('random_initialization_model_result_map.pkl') and use_cache:
         random_initialization_model_result_map = pickle.load(open('random_initialization_model_result_map.pkl', 'rb'))
     else:
@@ -1053,8 +1060,8 @@ def scatter_plot_bias_approach_bias_with(use_cache=True) :
     with open('random_initialization_model_result_map.pkl', 'wb') as f:
         pickle.dump(random_initialization_model_result_map, f)
     found_params = [random_initialization_model_result_map[i]['params'] for i,_ in  enumerate(random_initialization_model_result_map)] 
-    bias_app_idx = PARAMS['model_8'].index('bias_app')
-    bias_wth_idx = PARAMS['model_8'].index('bias_wth')
+    bias_app_idx = PARAMS[model_id].index('bias_app')
+    bias_wth_idx = PARAMS[model_id].index('bias_wth')
     bias_app = [p[bias_app_idx] for p in found_params]
     bias_wth = [p[bias_wth_idx] for p in found_params]
     plt.figure(figsize=(10, 10))
@@ -1066,7 +1073,5 @@ def scatter_plot_bias_approach_bias_with(use_cache=True) :
     plt.grid(True)  
     plt.savefig('bias_app_with_scatter.png')
     plt.show()
-# %%
+#%%
 scatter_plot_bias_approach_bias_with()
-
-# %%
