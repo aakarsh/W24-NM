@@ -595,7 +595,8 @@ PARAMS = {
     'model_4': ['learning_rate', 'beta', 'bias_app', 'bias_wth'],
     'model_5': ['learning_rate', 'rho_rew', 'rho_pun', 'bias_app', 'bias_wth'],
     'model_6': ['learning_rate', 'rho_rew_app', 'rho_rew_wth', 'rho_pun_app', 'rho_pun_wth', 'bias_app', 'bias_wth'],
-    'model_7': ['learning_rate_app', 'learning_rate_wth',  'rho_rew', 'rho_pun', 'bias_app', 'bias_wth']
+    'model_7': ['learning_rate_app', 'learning_rate_wth',  'rho_rew', 'rho_pun', 'bias_app', 'bias_wth'],
+    'model_8': ['learning_rate_app', 'learning_rate_wth',  'rho_rew', 'rho_pun', 'bias_app', 'bias_wth', 'bias_pav']
 }
 
 BOUNDS = {
@@ -643,6 +644,15 @@ BOUNDS = {
         'rho_pun': (0, 100),
         'bias_app': (-10, 10),
         'bias_wth': (-10, 10)
+    },
+    'model_8': {
+        'learning_rate_app': (0, 1),
+        'learning_rate_wth': (0, 1),
+        'rho_rew': (0, 100),
+        'rho_pun': (0, 100),
+        'bias_app': (-10, 10),
+        'bias_wth': (-10, 10),
+        'bias_pav': (-10, 10)
     }
 }
 
@@ -691,6 +701,15 @@ INITIAL_PARAMS = {
         'rho_pun': 0.5,
         'bias_app': 0.5,
         'bias_wth': 0.5
+    },
+    'model_8': {
+        'learning_rate_app': 0.1,
+        'learning_rate_wth': 0.1,
+        'rho_rew': 0.5,
+        'rho_pun': 0.5,
+        'bias_app': 0.5,
+        'bias_wth': 0.5,
+        'bias_pav': 0.5
     }
 }
 
@@ -701,7 +720,8 @@ MODELS = {
     'model_4': model_4,
     'model_5': model_5,
     'model_6': model_6,
-    'model_7': model_7
+    'model_7': model_7,
+    'model_8': model_8
 }
 
 #%%
