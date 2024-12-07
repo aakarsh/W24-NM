@@ -426,6 +426,47 @@ Model-6: Assumes that:
     * \rho_rew^{app}, \rho_rew^{wth}, \rho_pun^{app}, \rho_pun^{wth} - feedback sensitivity
     * bias_{app}, bias_{wth} - biases:
 """
+def model_6(data, learning_rate, 
+                    rho_rew_app, rho_rew_wth, 
+                    rho_pun_app, rho_pun_wth, 
+                    bias_app, bias_wth):
+    """
+    """
+    def q_bias(q, state):   
+        bias_matrix = np.array([
+            [0.0, bias_app],  # Go+ (state 0): NoGo = 0, Go = bias_app
+            [0.0, bias_wth],  # Go- (state 1): NoGo = 0, Go = bias_wth
+            [0.0, 0.0],       # NoGo+ (state 2): No bias for either action
+            [0.0, 0.0]        # NoGo- (state 3): No bias for either action
+        ])
+        return q[state] + bias_matrix[state] 
+        
+    def update_rule(q, state, action, reward):
+        """
+        q: np.ndarray
+            The Q-values
+        state: int
+            The current state
+        action: int
+            The current action
+        reward: int
+            The reward
+        """
+        # Define state-dependent feedback sensitivities
+        rho = 1.0
+        if state == 0:  # Go+ (approach block)
+            rho = (reward == 1) * rho_rew_app + (reward == -1) * rho_pun_app
+        elif state == 1:  # Go- (withdrawal block)
+            rho = (reward == 1) * rho_rew_wth + (reward == -1) * rho_pun_wth
+        else:
+            # For NoGo+ (state 2) and NoGo- (state 3), no additional sensitivity
+            rho = 1.0  # Default scaling factor, if no explicit sensitivity is applied
+
+        # Compute prediction error
+        prediction_error = (rho * reward) - q[state, action]
+        return q[state, action] + (learning_rate * prediction_error)
+    
+    return model_negative_log_likelihood(data, update_rule, q_bias=q_bias)
 
 """
 Model-7: Assumes that:
@@ -433,6 +474,45 @@ Model-7: Assumes that:
     * \rho_rew, \rho_pun - feedback sensitivity
     * bias_{app}, bias_{wth} - biases:
 """
+def model_7(data, learning_rate_app, learning_rate_wth, rho_rew, rho_pun, bias_app, bias_wth):
+    """
+    """
+    def q_bias(q, state):   
+        bias_matrix = np.array([
+            [0.0, bias_app],  # Go+ (state 0): NoGo = 0, Go = bias_app
+            [0.0, bias_wth],  # Go- (state 1): NoGo = 0, Go = bias_wth
+            [0.0, 0.0],       # NoGo+ (state 2): No bias for either action
+            [0.0, 0.0]        # NoGo- (state 3): No bias for either action
+        ])
+        return q[state] + bias_matrix[state] 
+        
+    def update_rule(q, state, action, reward):
+        """
+        q: np.ndarray
+            The Q-values
+        state: int
+            The current state
+        action: int
+            The current action
+        reward: int
+            The reward
+        """
+        # Determine the appropriate learning rate based on state
+        if state in [0, 2]:  # Go+ or NoGo+ (approach conditions)
+            learning_rate = learning_rate_app
+        elif state in [1, 3]:  # Go- or NoGo- (withdrawal conditions)
+            learning_rate = learning_rate_wth
+        else:
+            raise ValueError(f"Unexpected state: {state}")
+
+        rho = (reward == 1) * rho_rew + (reward == -1) * rho_pun
+        # Compute prediction error
+        prediction_error = (rho * reward) - q[state, action]
+        return q[state, action] + (learning_rate * prediction_error)
+    
+    return model_negative_log_likelihood(data, update_rule, q_bias=q_bias)
+
+            
 
 #%%
 method = 'Nelder-Mead'  
@@ -461,7 +541,7 @@ PARAMS = {
     'model_4': ['learning_rate', 'beta', 'bias_app', 'bias_wth'],
     'model_5': ['learning_rate', 'rho_rew', 'rho_pun', 'bias_app', 'bias_wth'],
     'model_6': ['learning_rate', 'rho_rew_app', 'rho_rew_wth', 'rho_pun_app', 'rho_pun_wth', 'bias_app', 'bias_wth'],
-    'model_7': ['learning_rate_rew', 'learning_rate_pun', 'learning_rate_omit', 'rho_rew', 'rho_pun', 'bias_app', 'bias_wth']
+    'model_7': ['learning_rate_app', 'learning_rate_wth',  'rho_rew', 'rho_pun', 'bias_app', 'bias_wth']
 }
 
 BOUNDS = {
@@ -493,6 +573,23 @@ BOUNDS = {
         'bias_app': (-10, 10),
         'bias_wth': (-10, 10)
     },
+    'model_6': {
+        'learning_rate': (0, 1),
+        'rho_rew_app': (0, 100),
+        'rho_rew_wth': (0, 100),
+        'rho_pun_app': (0, 100),
+        'rho_pun_wth': (0, 100),
+        'bias_app': (-10, 10),
+        'bias_wth': (-10, 10)
+    },
+    'model_7': {
+        'learning_rate_app': (0, 1),
+        'learning_rate_wth': (0, 1),
+        'rho_rew': (0, 100),
+        'rho_pun': (0, 100),
+        'bias_app': (-10, 10),
+        'bias_wth': (-10, 10)
+    }
 }
 
 INITIAL_PARAMS = {
@@ -524,6 +621,23 @@ INITIAL_PARAMS = {
         'bias_app': 0.5,
         'bias_wth': 0.5
     },
+    'model_6': {
+        'learning_rate': 0.1,
+        'rho_rew_app': 0.5,
+        'rho_rew_wth': 0.5,
+        'rho_pun_app': 0.5,
+        'rho_pun_wth': 0.5,
+        'bias_app': 0.5,
+        'bias_wth': 0.5
+    },
+    'model_7': {
+        'learning_rate_app': 0.1,
+        'learning_rate_wth': 0.1,
+        'rho_rew': 0.5,
+        'rho_pun': 0.5,
+        'bias_app': 0.5,
+        'bias_wth': 0.5
+    }
 }
 
 MODELS = {
@@ -532,8 +646,8 @@ MODELS = {
     'model_3': model_3,
     'model_4': model_4,
     'model_5': model_5,
-    #'model_6': model_6,
-    #'model_7': model_7
+    'model_6': model_6,
+    'model_7': model_7
 }
 
 #%%
