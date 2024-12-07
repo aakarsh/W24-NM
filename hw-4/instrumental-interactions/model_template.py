@@ -913,8 +913,8 @@ def plot_nll_and_bic(models, nlls, bics, save_path='nll_and_bic.png'):
     fig, ax1 = plt.subplots(figsize=(10, 5))
 
     # Plot NLL on the left y-axis
-    ax1.bar(models, nlls, color='blue', alpha=0.7, label='Negative Log-Likelihood')
-    ax1.set_ylabel('Negative Log-Likelihood', color='blue')
+    ax1.bar(models, nlls, color='blue', alpha=0.7, label='Log-Likelihood')
+    ax1.set_ylabel('Log-Likelihood', color='blue')
     ax1.tick_params(axis='y', labelcolor='blue')
 
     # Plot BIC on the right y-axis
