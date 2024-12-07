@@ -7,6 +7,7 @@ import jax
 import seaborn as sns
 import pandas as pd
 import numpy as np
+import random
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 import multiprocessing as mp
@@ -752,20 +753,26 @@ Pay attention to initialize the parameters
         to save time you can e.g.  only apply the logarithm at the end, 
         rather than during every iteration of your for-loop
 """
-def fit_subject(subject_id, model_id, df, model, method='Nelder-Mead', force_new=False):
+def fit_subject(subject_id, model_id, df, model, method='Nelder-Mead', 
+                initial_params=INITIAL_PARAMS, bounds=BOUNDS):
+        
     subject_data = subject_df(df, subject_id) # subset data to one subject
     subject_data = subject_data.reset_index(drop=True)  # not resetting the index can lead to issues
+    
     print(f'Fitting model {model_id} to subject {subject_id}')
 
-    # define yourself a loss for the current model
+    # Define yourself a loss for the current model
     def loss(params):
         return model(subject_data, *params)
+
+    opt_initial_params = [initial_params[model_id][p] for p in PARAMS[model_id]]
+    opt_bounds = [bounds[model_id][p] for p in PARAMS[model_id]]
     
-    initial_params = [INITIAL_PARAMS[model_id][p] for p in PARAMS[model_id]]
-    bounds = [BOUNDS[model_id][p] for p in PARAMS[model_id]]
-    res = minimize(loss, initial_params, bounds=bounds, method=method, 
-                    tol=1e-6,
-                    options={'disp': True })
+    res = minimize(loss, 
+                        opt_initial_params, 
+                        bounds=opt_bounds, 
+                        method=method, 
+                        tol=1e-6, options={'disp': True })
 
     num_params = len(res.x)
     num_trials = len(subject_data)
@@ -776,7 +783,7 @@ def fit_subject(subject_id, model_id, df, model, method='Nelder-Mead', force_new
               "negative_log_likelihood": res.fun, 
               "params": res.x, 
               "num_params": num_params, 
-              "num_trials": num_trials 
+              "num_trials": num_trials,
         }
 
 #%%
@@ -977,11 +984,48 @@ plot_nll_and_bic(models, nlls, bics)
     \textbf{Compare the fitted $\epsilon_{\text{app}}$ and $\epsilon_{\text{wth}}$ for the last model.} \\
     How do you interpret the difference in their means?
 """
+subject_results = model_results['model_8']['subject_results']
+median_eps_app = np.median([sr['params'][0] for sr in subject_results])
+median_eps_wth = np.median([sr['params'][1] for sr in subject_results])
+median_bias_app = np.median([sr['params'][2] for sr in subject_results])
+median_bias_wth = np.median([sr['params'][3] for sr in subject_results])
 
+for sr in subject_results:
+    print(f'Subject ID: {sr["subject_id"]}')
+    for idx, param in enumerate(PARAMS['model_8']):
+        print(f'\t\t{param}: {sr["params"][idx]:.5f}')
+print("")
+print(f'Median Learning Rate for Approach: {median_eps_app:.5f}')
+print(f'Median Learning Rate for Withdrawal: {median_eps_wth:.5f}')
+print(f'Median Bias for Approach: {median_bias_app:.5f}')
+print(f'Median Bias for Withdrawal: {median_bias_wth:.5f}')
+print("")
+
+# Median Learning Rate for Approach: 0.19933
+# Median Learning Rate for Withdrawal: 0.25130
+# Median Bias for Approach: 1.78337
+# Median Bias for Withdrawal: 1.60453
+
+#%%
 """
-for the last model:
-    - compare the fitted :
+%% Task-7:
+
+\textbf{Bonus: Fit the first subject 10 times with the last model, 
+               using different initial parameters.} \\
+                   
+Create a scatter plot between the fitted 
+    $\text{bias}_{\text{app}}$ and $\text{bias}_{\text{wth}}$ 
+    across the fits. 
+    
+How do you explain this plot?
+
+For the last model:
+    - Compare the fitted :
         - \epsilon_{app} 
         - \epsilon_{wth} 
-    - How do you interpret the difference in their means?
+        
+    - How do you interpret the difference in their means ?
 """
+#%%
+
+#%%
