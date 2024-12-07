@@ -585,7 +585,9 @@ def BIC(n, k, log_likelihood):
     log_likelihood: float   
         The log-likelihood of the model
     """
-    return k * np.log(n) - 2 * log_likelihood
+    retval= k * np.log(n) - 2 * log_likelihood
+    print(f'BIC: {retval}')
+    return retval
 
 #%%
 PARAMS = {
@@ -793,7 +795,7 @@ def fit_model(df, model, model_id, method='Nelder-Mead', use_cache=True):
         print(f"model {model_id} subject {subject_id}: params = {params}, negative-log-likelihood = {negative_log_likelihood}")
                 
     # compute BIC
-    subject_bics = [BIC(r["num_trials"], r["num_params"], r["negative_log_likelihood"]) for r in subject_results]
+    subject_bics = [BIC(r["num_trials"], r["num_params"], -r["negative_log_likelihood"]) for r in subject_results]
     subject_neg_log_likelihoods = [r["negative_log_likelihood"] for r in subject_results]
     model_bic = np.sum(subject_bics)
     model_neg_log_likelihood = np.sum(subject_neg_log_likelihoods)
