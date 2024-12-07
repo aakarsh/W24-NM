@@ -1045,24 +1045,28 @@ def random_initialization_fit_subject(subject_id=0,model_id='model_8', model=mod
                                             for _, initial_params in enumerate(param_list))
     return model_results_map
 #%%
-random_initialization_model_result_map = random_initialization_fit_subject(df=df, n_iter=30)
-#%% Save random intitialziation map to file.
-with open('random_initialization_model_result_map.pkl', 'wb') as f:
-    pickle.dump(random_initialization_model_result_map, f)
-#%%
-found_params = [random_initialization_model_result_map[i]['params'] for i,_ in  enumerate(random_initialization_model_result_map)] 
-bias_app_idx = PARAMS['model_8'].index('bias_app')
-bias_wth_idx = PARAMS['model_8'].index('bias_wth')
-bias_app = [p[bias_app_idx] for p in found_params]
-bias_wth = [p[bias_wth_idx] for p in found_params]
-#% 
-plt.figure(figsize=(10, 10))
-plt.title('Scatter Plot of Bias for Approach and Withhold')
-plt.xlabel('Bias for Approach')
-plt.ylabel('Bias for Withhold')
-bias_app_with_df = pd.DataFrame({'bias_app': bias_app, 'bias_wth': bias_wth})
-sns.scatterplot(data=bias_app_with_df, x='bias_app', y='bias_wth')
-plt.grid(True)  
-plt.savefig('bias_app_with_scatter.png')
-plt.show()
+def scatter_plot_bias_approach_bias_with(use_cache=True) :
+    if os.path.exists('random_initialization_model_result_map.pkl') and use_cache:
+        random_initialization_model_result_map = pickle.load(open('random_initialization_model_result_map.pkl', 'rb'))
+    else:
+        random_initialization_model_result_map = random_initialization_fit_subject(df=df, n_iter=30)
+    with open('random_initialization_model_result_map.pkl', 'wb') as f:
+        pickle.dump(random_initialization_model_result_map, f)
+    found_params = [random_initialization_model_result_map[i]['params'] for i,_ in  enumerate(random_initialization_model_result_map)] 
+    bias_app_idx = PARAMS['model_8'].index('bias_app')
+    bias_wth_idx = PARAMS['model_8'].index('bias_wth')
+    bias_app = [p[bias_app_idx] for p in found_params]
+    bias_wth = [p[bias_wth_idx] for p in found_params]
+    plt.figure(figsize=(10, 10))
+    plt.title('Scatter Plot of Bias for Approach and Withhold')
+    plt.xlabel('Bias for Approach')
+    plt.ylabel('Bias for Withhold')
+    bias_app_with_df = pd.DataFrame({'bias_app': bias_app, 'bias_wth': bias_wth})
+    sns.scatterplot(data=bias_app_with_df, x='bias_app', y='bias_wth')
+    plt.grid(True)  
+    plt.savefig('bias_app_with_scatter.png')
+    plt.show()
+# %%
+scatter_plot_bias_approach_bias_with()
+
 # %%
