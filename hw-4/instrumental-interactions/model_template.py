@@ -1,7 +1,4 @@
 #%%
-"""
-    Example structure for fitting multiple models, feel free to modify to your liking
-"""
 import os
 import pickle
 import json
@@ -19,9 +16,14 @@ from  datetime import datetime
 sns.set_theme(style='white', context='notebook', font_scale=1.2)
 #%%
 df = pd.read_csv('gen_data.csv')
-cue_mapping = {1: 'Go+', 2: 'Go-', 3: 'NoGo+', 4: 'NoGo-'}  # Go+ = Go to win, Go- = go to avoid losing, NoGo+ = don't go to win, NoGo- = don't go to avoid losing
+# Go+ = Go to win
+# Go- = Go to avoid losing
+# NoGo+ = Don't go to win
+# NoGo- = Don't go to avoid losing
+cue_mapping = { 1: 'Go+', 2: 'Go-', 3: 'NoGo+', 4: 'NoGo-' }  
 #%%
 """
+\subsection{Task-1:}
 
 * It contains the data of 10 subjects :
     (see column ”ID” for the subject identifier)
@@ -43,12 +45,13 @@ cue_mapping = {1: 'Go+', 2: 'Go-', 3: 'NoGo+', 4: 'NoGo-'}  # Go+ = Go to win, G
     (1) - go
     
 * "outcome" contains whether  :
-    (1) - reward was delivered  
-    (0) - nothing was delivered 
-    (-1)-  a punishment was given 
+    (1)  - reward was delivered  
+    (0)  - nothing was delivered 
+    (-1) -  a punishment was given 
 """
 #%%
-# Exercise-1: Plot the Accuracy for each Cue
+# \section{Exercise-1}: Plot the Accuracy for each Cue
+#
 """
     Recreate figure 2E of the paper :
     "
@@ -71,7 +74,8 @@ def compute_accuracy(df, cue_mapping=cue_mapping):
             print(f'Go+: {accuracy_map[cue_mapping[cue]]}')
         elif cue_mapping[cue] == 'Go-':
             # Cue type was Go- : Go to avoid punishment
-            # Subject answers presses the button to avoid punishment 
+            # Subject answers presses the button to 
+            # avoid punishment 
             # Thus accuracy is the mean of the pressed column
             accuracy_map[cue_mapping[cue]] = cue_df['pressed'].mean()
             print(f'Go-: {accuracy_map[cue_mapping[cue]]}')
@@ -114,6 +118,8 @@ assert min(accuracy_map.values()) == accuracy_map['NoGo+']
 assert max(accuracy_map.values()) == accuracy_map['Go+']
 #%%
 """
+\subsection{Task-2}:
+
 Program the log-likelihood functions of the models 1 to 7.
 (including) presented in 
     "Disentangling the Roles of Approach, Activation and 
@@ -172,14 +178,17 @@ def empty_q(num_cues, num_actions):
 first_subject_df = subject_df(df, 0)
 
 #%%
-def model_negative_log_likelihood(data, q_update, q_init=empty_q, q_bias=None):
+def model_negative_log_likelihood(data, 
+                                  q_update, 
+                                  q_init=empty_q, 
+                                  q_bias=None):
     """
-    data: pd.DataFrame
-        The data of one subject
-    q_update: function
-        The function to update the Q-values
-    model_params: dict
-        The parameters of the model
+        data: pd.DataFrame
+            The data of one subject
+        q_update: function
+            The function to update the Q-values
+        model_params: dict
+            The parameters of the model
     """
     # Run a q-learning model on the data,  return the 
     # log-likelihood parameters are learning rate and beta, 
@@ -840,12 +849,40 @@ model_results = fit_models(df, MODELS, method='Nelder-Mead', use_cache=True)
 save_mode_results(model_results)
 
 #%%
+def min_neg_log_likelihood(model_results):
+    """
+    Find the model with the minimum negative log-likelihood.
+    """
+    min_model = None
+    min_neg_log_likelihood = np.inf
+    for model_id, model_result in model_results.items():
+        if model_result['model_neg_log_likelihood'] < min_neg_log_likelihood:
+            min_model = model_id
+            min_neg_log_likelihood = model_result['model_neg_log_likelihood']
+    return min_model
+
+def min_bic(model_results):
+    min_model = None
+    min_bic = np.inf
+    for model_id, model_result in model_results.items():
+        if model_result['model_bic'] < min_bic:
+            min_model = model_id
+            min_bic = model_result['model_bic']
+    return min_model
+   
+min_neg_log_likelihood = min_neg_log_likelihood(model_results)
+min_bic = min_bic(model_results) 
+print(f'Minimum Negative Log-Likelihood: {min_neg_log_likelihood}')
+print(f'Minimum BIC: {min_bic}')
+#%%
 assert len(model_results.items()) == len(MODELS)
 #assert np.isclose(model_results['model_1']['model_neg_log_likelihood'] , 3248.52)
 #assert np.isclose(model_results['model_1']['model_bic'] , -6369.10.98)
 
 #%%
 """
+\subsection{Task-5:}
+
 - Sum up the optimized log-likelihoods across all subjects for each model ?
 
 - Use this and all other relevant values to compute the BIC score for each model ?
@@ -895,18 +932,7 @@ plot_log_likelihoods(models, log_likelihoods)
 plot_bics(models, bics)
 
 #%%
-"""
-for the last model:
-    - compare the fitted :
-        - \epsilon_{app} 
-        - \epsilon_{wth} 
-    - How do you interpret the difference in their means?
-"""
-
 # Plot learning rates of the last model.
-
-
-
 #%%
 def plot_nll_and_bic(models, nlls, bics, save_path='nll_and_bic.png'):
     """
@@ -916,8 +942,9 @@ def plot_nll_and_bic(models, nlls, bics, save_path='nll_and_bic.png'):
     padding =10
 
     log_likelihoods = [-nll for nll in nlls]    
-    nll_min = min(log_likelihoods) - padding   # addng some padding
-    nll_max = max(log_likelihoods) + padding   # addng some padding
+    # Adding some padding
+    nll_min = min(log_likelihoods) - padding   
+    nll_max = max(log_likelihoods) + padding
   
     ax1.bar(models, log_likelihoods, color='blue', alpha=0.7, label='Log-Likelihood')
     ax1.set_ylabel('Log-Likelihood', color='blue')
@@ -937,7 +964,7 @@ def plot_nll_and_bic(models, nlls, bics, save_path='nll_and_bic.png'):
     plt.savefig(save_path)
     plt.show()
 
-# Data preparation
+# Data Preparation
 models = list(model_results.keys())
 nlls = [model_results[model_id]['model_neg_log_likelihood'] for model_id in models]
 bics = [model_results[model_id]['model_bic'] for model_id in models]
@@ -945,4 +972,16 @@ bics = [model_results[model_id]['model_bic'] for model_id in models]
 # Plot NLL and BIC in a single graph
 plot_nll_and_bic(models, nlls, bics)
 #%%
-# Bonus
+"""
+\subsection{Task-6}:  
+    \textbf{Compare the fitted $\epsilon_{\text{app}}$ and $\epsilon_{\text{wth}}$ for the last model.} \\
+    How do you interpret the difference in their means?
+"""
+
+"""
+for the last model:
+    - compare the fitted :
+        - \epsilon_{app} 
+        - \epsilon_{wth} 
+    - How do you interpret the difference in their means?
+"""
