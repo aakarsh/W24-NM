@@ -1,22 +1,24 @@
 #%%
-import os
-import pickle
-import json
-from numba import njit
-import jax
-import seaborn as sns
-import pandas as pd
-import numpy as np
-import random
-import matplotlib.pyplot as plt
-from scipy.optimize import minimize
-import multiprocessing as mp
-from joblib import Parallel, delayed
+
 from  datetime import datetime
+from joblib import Parallel, delayed
+from numba import njit
+from scipy.optimize import minimize
+import jax
+import json
+import matplotlib.pyplot as plt
+import multiprocessing as mp
+import numpy as np
+import os
+import pandas as pd
+import pickle
+import random
+import seaborn as sns
 
 sns.set_theme(style='white', context='notebook', font_scale=1.2)
 #%%
 df = pd.read_csv('gen_data.csv')
+
 # Go+ = Go to win
 # Go- = Go to avoid losing
 # NoGo+ = Don't go to win
@@ -1075,3 +1077,4 @@ def scatter_plot_bias_approach_bias_with(use_cache=True, model_id='model_8'):
     plt.show()
 #%%
 scatter_plot_bias_approach_bias_with()
+#%%
