@@ -208,19 +208,18 @@ def actor_critic(state_representation, n_steps,
     # w - weights for the value function
     V_weights = np.zeros(num_states) # TODO
 
-    earned_rewards = 0 # TODO
+    earned_rewards = [] # TODO
     LEGAL_MOVES = legal_moves()
 
-    # iterate over episodes
+    # Iterate over episodes
     for _ in range(n_episodes):
         # Initializations
         # TODO
-        episode_reward = 0
         # Move to the start state
         state_idx = start_func()
         # cumulative discount factor
         I = 1
-        
+
         # Go until goal is reached
         for t in range(n_steps):
             # Act and Learn (Update both M and V_weights)
@@ -245,7 +244,6 @@ def actor_critic(state_representation, n_steps,
                 V_new_state = V_weights @ state_representation[new_state_idx]  if not goal_reached else 0
                 V_diff = (gamma *V_new_state) - V_state 
                 reward = goal_reach_reward if goal_reached else step_penalty
-                earned_rewards += reward 
                 # TD error 
                 delta = reward + V_diff
                 # linear function \nabla_{V_weights} X(s)* V_weights  = X(s)
@@ -257,7 +255,9 @@ def actor_critic(state_representation, n_steps,
                 M[state_idx, chosen_action] += alpha * I * delta * (1) # so we have net (1 - action_probabilities[chosen_action]) increase in probability
                
                 # absorbing state  
-                if (i, j) == goal: break
+                if (i, j) == goal: 
+                    earned_rewards.append(I*reward)
+                    break
                 state_idx = new_state_idx 
                 I *= gamma
             else: # no transition reward
@@ -288,8 +288,7 @@ def learn_from_traj(succ_repr, trajectory, gamma=0.98, alpha=0.05):
 # Part 1
 
 #%%
-# M, V, earned_rewards = actor_critic(TODO, n_steps=300, alpha=0.05, gamma=0.99, n_episodes=1000)
-M, V, earned_rewards = actor_critic(np.eye(maze.shape[0]*maze.shape[1]), n_steps=300, 
+M, V, earned_rewards = actor_critic(np.eye(maze.size), n_steps=300, 
                                         alpha=0.05, gamma=0.99, 
                                         n_episodes=1000)
 
@@ -305,8 +304,18 @@ plt.show()
 
 # Part 2, now the same for an SR representation
 #%%
+M, V, earned_rewards = actor_critic(analytical_sr, n_steps=300, alpha=0.05, gamma=0.99, n_episodes=1000)
 
-TODO
+#%%
+# plot state-value function
+plot_maze(maze)
+plt.imshow(V.reshape(maze.shape), cmap='hot')
+plt.show()
+
+plt.plot(earned_rewards)
+plt.show()
+
+
 
 # Part 3
 #%%
