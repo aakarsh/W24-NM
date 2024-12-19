@@ -289,7 +289,7 @@ def learn_from_traj(succ_repr, trajectory, gamma=0.98, alpha=0.05):
 
 #%%
 # M, V, earned_rewards = actor_critic(TODO, n_steps=300, alpha=0.05, gamma=0.99, n_episodes=1000)
-M, V, earned_rewards = actor_critic(analytical_sr, n_steps=300, 
+M, V, earned_rewards = actor_critic(np.eye(maze.shape[0]*maze.shape[1]), n_steps=300, 
                                         alpha=0.05, gamma=0.99, 
                                         n_episodes=1000)
 
