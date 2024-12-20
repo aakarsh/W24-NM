@@ -72,6 +72,9 @@ transitions = compute_transition_matrix(maze)
 
 
 #%%
+def random_walk_sr(transitions, gamma):
+    return np.linalg.inv(np.eye(transitions.shape[0]) - gamma * transitions.T)
+
 def analytical_sr(transitions, gamma):
     return np.linalg.inv(np.eye(transitions.shape[0]) - gamma * transitions.T)
 
@@ -80,7 +83,7 @@ i, j = start
 # compute the SR for all states, based on the transition matrix
 # note that we use a lower discounting here, to keep the SR more local
 analytical_sr = analytical_sr(transitions, 0.8).T
-
+analytical_sr_read_only = analytical_sr[:]
 #%%
 # Part 1: Program an actor-critic algorithm:
 # To navigate the maze,  
@@ -207,21 +210,24 @@ def actor_critic(state_representation, n_steps,
     num_states = state_representation.shape[0]
     # w - weights for the value function
     V_weights = np.zeros(num_states) # TODO
-
+    #
     earned_rewards = [] # TODO
+
     LEGAL_MOVES = legal_moves()
 
     # Iterate over episodes
     for _ in range(n_episodes):
         # Initializations
         # TODO
-        # Move to the start state
+        # Move to the start state/possibly random start state
         state_idx = start_func()
         # cumulative discount factor
         I = 1
+        # episode trajectory
+        trajectory = []
 
         # Go until goal is reached
-        for t in range(n_steps):
+        for _ in range(n_steps):
             # Act and Learn (Update both M and V_weights)
             
             # Compute action probabilities
@@ -229,20 +235,20 @@ def actor_critic(state_representation, n_steps,
             # Choose action according to action probabilities
             chosen_action = np.random.choice(4, p=action_probabilities)
             
-            # Take action
+            # take action
             move = LEGAL_MOVES[chosen_action]
-            new_state = tuple(np.array(position_from_idx(state_idx, maze)) + np.array(move))  
+            new_state = tuple(np.array(position_from_idx(state_idx, maze)) + np.array(move))
             i, j = new_state 
             
-            
             if check_legal(maze, (i, j)): 
+                trajectory.append(state_idx)
                 goal_reached = (i, j) == goal
                 V_state = V_weights @ state_representation[state_idx]
                 # Compute the value of the new state, goal-state has value 0 
                 new_state_idx = position_idx(i, j, maze)
                 # V(s) = X(s) \cdot w || V(s) = 0 if s is goal
                 V_new_state = V_weights @ state_representation[new_state_idx]  if not goal_reached else 0
-                V_diff = (gamma *V_new_state) - V_state 
+                V_diff = ( gamma * V_new_state ) - V_state 
                 reward = goal_reach_reward if goal_reached else step_penalty
                 # TD error 
                 delta = reward + V_diff
@@ -251,36 +257,38 @@ def actor_critic(state_representation, n_steps,
                 # Assuming same \alpha^\theta == \alpha^\theat) :( ?
                 # Reduce the probability of the not-chosen action 
                 M[state_idx, :] += alpha * I * delta * (-action_probabilities) 
-                # Reduce the probability of the not-chosen action 
                 M[state_idx, chosen_action] += alpha * I * delta * (1) # so we have net (1 - action_probabilities[chosen_action]) increase in probability
                
                 # absorbing state  
                 if (i, j) == goal: 
-                    earned_rewards.append(I*reward)
-                    break
+                    earned_rewards.append(I * reward)
+                    if update_sr: # update the state representation
+                         for idx, state_idx in enumerate(trajectory):
+                            state_representation[state_idx, :] = \
+                                learn_from_traj(state_representation[state_idx], 
+                                                trajectory[idx:], gamma, alpha)
+                    break # END EPISODE
+                
                 state_idx = new_state_idx 
                 I *= gamma
             else: # no transition reward
                 episode_reward += step_penalty
-        if update_sr:
-            pass # TODO
-
     return M, V_weights, earned_rewards
 
 
 #%%
-# One part to the solution of exercise part 3, if you want to update the SR after each episode
+# One part to the solution of exercise part 3, if you want to update the 
+# SR after each episode
 def learn_from_traj(succ_repr, trajectory, gamma=0.98, alpha=0.05):
-    # Write a function to update a given successor representation (for the state at which the trajectory starts) using an example trajectory
-    # using discount factor gamma and learning rate alpha
-
+    # Write a function to update a given successor representation 
+    # (for the state at which the trajectory starts) using an 
+    # example trajectory using:
+    #       discount factor gamma 
+    #       learning rate alpha
     observed = np.zeros_like(succ_repr)
-
     for i, state in enumerate(trajectory):
         observed[state] += gamma ** i
-
     succ_repr += alpha * (observed - succ_repr)
-
     # return the updated successor representation
     return succ_repr
 
@@ -304,7 +312,7 @@ plt.show()
 
 # Part 2, now the same for an SR representation
 #%%
-M, V, earned_rewards = actor_critic(analytical_sr, n_steps=300, alpha=0.05, gamma=0.99, n_episodes=1000)
+M, V, earned_rewards = actor_critic(analytical_sr_read_only, n_steps=300, alpha=0.05, gamma=0.99, n_episodes=1000)
 
 #%%
 # plot state-value function
@@ -317,19 +325,38 @@ plt.show()
 
 
 
-# Part 3
 #%%
+# Part 3
+def random_start(maze):
+    def pick_start():
+        # Suggested encoding of 2-D location onto states.
+        i, j = (1, 1)
+        while True:
+            i, j = np.random.randint(maze.shape[0]), np.random.randint(maze.shape[1])
+            if check_legal(maze, (i, j)):
+                break
+        state = position_idx(i,j, maze) 
+        return state
+    # Define yourself a function to return a random (non-wall) starting state 
+    # to pass into the actor_critic function.
+    return pick_start
 
-TODO
-def random_start():
-    # Define yourself a function to return a random (non-wall) starting state to pass into the actor_critic function
-    return TODO
+M, V, earned_rewards = actor_critic(random_walk_sr(transitions, 0.8).T, 300, 0.05, 0.99, 1000,
+                                       update_sr=True, start_func=random_start(maze))
+#%%
+plt.plot(maze)
+plt.imshow(V.reshape(maze.shape), cmap='hot')
+plt.show()
 
-M, V, earned_rewards = actor_critic(TODO, 300, 0.05, 0.99, 1000, update_sr=True, start_func=random_start)
+#%%
+plt.plot(earned_rewards)
+plt.show()
 
-# Plot the SR of some states after this learning, also anything else you want
-TODO
 
+
+#%%
+# Plot the SR of some states after this learning, also anything else you want.
+# TODO:-
 # Part 4
 
 TODO
@@ -368,3 +395,4 @@ for v_inits in [TODO]:
         TODO
 
 # plot the resulting learning curves
+# %%
