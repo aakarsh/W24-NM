@@ -347,8 +347,15 @@ def random_start(maze):
     # to pass into the actor_critic function.
     return pick_start
 
+#%%
+plt.hist([random_start(maze)() for i in range(100000)], bins=100)
+
+#%%
 start_func = random_start(maze)
-M, V, earned_rewards = actor_critic(random_walk_sr(transitions, 0.8).T, 300, 0.05, 0.99, 1000,
+learning_sr = random_walk_sr(transitions, 0.8).T
+n_steps = 1000 # 300 steps per episode
+n_episodes = 5000 # 1000 episodes
+M, V, earned_rewards = actor_critic(learning_sr, n_steps, 0.05, 0.99, n_episodes,
                                        update_sr=True, start_func=start_func)
 
 plot_maze(maze)
@@ -359,12 +366,23 @@ plt.show()
 plt.plot(earned_rewards)
 plt.show()
 
-
-
 #%%
 # Plot the SR of some states after this learning, also anything else you want.
 # TODO:-
 # Part 4
+#%% Plot the SR 
+plt.plot(learning_sr[0, :])
+plt.plot(learning_sr[1, :])
+plt.imshow(learning_sr, cmap='hot')
+
+#%%
+for state_idx in range(maze.size):
+    plt.figure()
+    plt.imshow(learning_sr[state_idx, :].reshape(maze.shape), cmap='hot')
+    plt.title(f"SR for state {position_from_idx(state_idx,maze)}, goal at {goal}")
+    plt.colorbar()
+    plt.show()
+#%% Plot the SR 
 
 TODO
 goal = (5, 5)
