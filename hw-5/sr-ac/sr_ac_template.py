@@ -216,11 +216,16 @@ def actor_critic(state_representation, n_steps,
 
     LEGAL_MOVES = legal_moves()
 
+    episode_counters = [] 
     # Iterate over episodes
     for _ in range(n_episodes):
         # Initializations
         # TODO
         # Move to the start state/possibly random start state
+        per_episode_counters = {} 
+        per_episode_counters["state_visit_counts"] = np.zeros(num_states)
+        episode_counters.append(per_episode_counters)
+        
         perf_counters["num_episodes"] += 1
         state_idx = start_func()
         # cumulative discount factor
@@ -232,57 +237,68 @@ def actor_critic(state_representation, n_steps,
         for _ in range(n_steps):
             perf_counters["num_steps"] += 1
             # Act and Learn (Update both M and V_weights)
+           
+            is_legal_move = False
+            move= None
+            new_state = None
             
-            # Compute action probabilities
-            action_probabilities = softmax(M[state_idx, :])
-            # Choose action according to action probabilities
-            chosen_action = np.random.choice(4, p=action_probabilities)
-            
-            # take action
-            move = LEGAL_MOVES[chosen_action]
-            new_state = tuple(np.array(position_from_idx(state_idx, maze)) + np.array(move))
-            i, j = new_state 
-            
-            if check_legal(maze, (i, j)): 
-                trajectory.append(state_idx)
-                goal_reached = (i, j) == goal
-                if goal_reached:
-                    perf_counters["num_goal_reached"] += 1
-
-                V_state = V_weights @ state_representation[state_idx]
-                # Compute the value of the new state, goal-state has value 0 
+            while not is_legal_move:
+                # Compute action probabilities
+                action_probabilities = softmax(M[state_idx, :])
+                valid_actions = np.where(M[state_idx, :] > -np.inf)[0]
+                 
+                valid_probabilities = action_probabilities[valid_actions]
+                valid_probabilities /= valid_probabilities.sum()  # Normalize probabilities
+                chosen_action = np.random.choice(valid_actions, p=valid_probabilities)
+                # Choose action according to action probabilities
+                # chosen_action = np.random.choice(4, p=action_probabilities)
+                # take action
+                move = LEGAL_MOVES[chosen_action]
+                new_state = tuple(np.array(position_from_idx(state_idx, maze)) + np.array(move))
+                i, j = new_state
                 new_state_idx = position_idx(i, j, maze)
-                # V(s) = X(s) \cdot w || V(s) = 0 if s is goal
-                V_new_state = V_weights @ state_representation[new_state_idx]  if not goal_reached else 0
-                #  
-                V_diff = ( gamma * V_new_state ) - V_state 
-                reward = goal_reach_reward if goal_reached else step_penalty
-                # TD error 
-                delta = reward + V_diff
-                # linear function \nabla_{V_weights} X(s)* V_weights  = X(s)
-                V_weights += alpha * delta * state_representation[state_idx] 
-                # Assuming same \alpha^\theta == \alpha^\theat) :( ?
-                # Reduce the probability of the not-chosen action 
-                M[state_idx, :] += alpha * I * delta * (-action_probabilities) 
-                M[state_idx, chosen_action] += alpha * I * delta * (1) # so we have net (1 - action_probabilities[chosen_action]) increase in probability
-               
-                # Absorbing state  
-                if (i, j) == goal: 
-                    earned_rewards.append(I * reward)
-                    if update_sr: # Update the state representation
-                        for idx, state_idx in enumerate(trajectory):
-                            assert check_legal(maze, position_from_idx(state_idx, maze)), \
-        f"Invalid state in trajectory: {position_from_idx(state_idx, maze)}"
-                            current_trajectory = trajectory[idx:]
-                            state_representation[state_idx, :] = \
-                                learn_from_traj(state_representation[state_idx], 
-                                                current_trajectory, gamma, alpha)
-                    break # END EPISODE
-                
-                state_idx = new_state_idx 
-                I *= gamma
-            else: # no transition reward
-                episode_reward += step_penalty
+                is_legal_move = check_legal(maze, new_state)
+                if not is_legal_move:
+                    per_episode_counters["rejections"] = per_episode_counters.get("rejections", 0) + 1
+                else:
+                    per_episode_counters["actions"] = per_episode_counters.get("actions", 0) + 1
+        
+            per_episode_counters["state_visit_counts"][state_idx] += 1 
+            
+            V_state = V_weights @ state_representation[state_idx]
+            goal_reached = new_state == goal   
+            # Compute the value of the new state, goal-state has value 0 
+            # V(s) = X(s) \cdot w || V(s) = 0 if s is goal
+            V_new_state = V_weights @ state_representation[new_state_idx]  \
+                if not goal_reached else 0
+            #  
+            V_diff = ( gamma * V_new_state ) - V_state 
+            reward = goal_reach_reward if goal_reached else step_penalty
+            # TD error 
+            delta = reward + V_diff
+            # linear function \nabla_{V_weights} X(s)* V_weights  = X(s)
+            V_weights += alpha * delta * state_representation[state_idx] 
+            # Assuming same \alpha^\theta == \alpha^\theat) :( ?
+            # Reduce the probability of the not-chosen action 
+            M[state_idx, :] += alpha * I * delta * (-action_probabilities) 
+            M[state_idx, chosen_action] += alpha * I * delta * (1) # so we have net (1 - action_probabilities[chosen_action]) increase in probability
+            
+            # Absorbing state  
+            if (i, j) == goal: 
+                earned_rewards.append(I * reward)
+                if update_sr: # Update the state representation
+                    for idx, state_idx in enumerate(trajectory):
+                        assert check_legal(maze, position_from_idx(state_idx, maze)), \
+    f"Invalid state in trajectory: {position_from_idx(state_idx, maze)}"
+                        current_trajectory = trajectory[idx:]
+                        state_representation[state_idx, :] = \
+                            learn_from_traj(state_representation[state_idx], 
+                                            current_trajectory, gamma, alpha)
+                break # END EPISODE
+            
+            state_idx = new_state_idx 
+            I *= gamma
+    perf_counters["episode_counters"] = episode_counters
     print(perf_counters)
     return M, V_weights, earned_rewards
 
@@ -305,7 +321,6 @@ def learn_from_traj(succ_repr, trajectory, gamma=0.98, alpha=0.05):
 
 
 # Part 1
-
 #%%
 M, V, earned_rewards = actor_critic(np.eye(maze.size), n_steps=300, 
                                         alpha=0.05, gamma=0.99, n_episodes=1000)
@@ -348,33 +363,39 @@ def random_start(maze):
                                 if check_legal(maze, (i, j))])
     return lambda: pick_random_element(free_states)
 #%%
-plt.hist([random_start(maze)() for i in range(100000)],  bins=np.arange(maze.size + 1) - 0.5)
+plt.hist([random_start(maze)() for i in range(1000)],  bins=np.arange(maze.size + 1) - 0.5)
 
 #%%
 start_func = random_start(maze)
 learning_sr = random_walk_sr(transitions, 0.8).T
-n_steps = 1000 # 300 steps per episode
-n_episodes = 5000 # 1000 episodes
+n_steps = 300 # 300 steps per episode
+n_episodes = 1000 # 1000 episodes
 alpha = 0.05
 gamma = 0.99
 
 M, V, earned_rewards = actor_critic(learning_sr, n_steps, alpha, gamma, n_episodes,
                                        update_sr=True, start_func=start_func)
-#%%
+
+#%% - TODO: The issue seems to be that the V that i am  Learning does not have differentiated values 
 plot_maze(maze)
+plt.title(f"State-value function : goal at {goal}")
 plt.imshow(V.reshape(maze.shape), cmap='hot')
 plt.show()
 #%%
 plt.plot(earned_rewards)
 plt.show()
+
+#%%
+plt.hist(V,  bins=np.arange(maze.size + 1) - 0.5)
+
 #%%
 # Plot the SR of some states after this learning, also anything else you want.
-# TODO:-
-# Part 4
+# TODO:- # Part 4
 #%% Plot the SR 
 plt.plot(learning_sr[0, :])
 plt.plot(learning_sr[1, :])
 plt.imshow(learning_sr, cmap='hot')
+
 #%%
 for state_idx in range(maze.size):
     if check_legal(maze, position_from_idx(state_idx, maze)):
