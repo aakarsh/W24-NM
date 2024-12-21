@@ -355,7 +355,10 @@ start_func = random_start(maze)
 learning_sr = random_walk_sr(transitions, 0.8).T
 n_steps = 1000 # 300 steps per episode
 n_episodes = 5000 # 1000 episodes
-M, V, earned_rewards = actor_critic(learning_sr, n_steps, 0.05, 0.99, n_episodes,
+alpha = 0.05
+gamma = 0.99
+
+M, V, earned_rewards = actor_critic(learning_sr, n_steps, alpha, gamma, n_episodes,
                                        update_sr=True, start_func=start_func)
 #%%
 plot_maze(maze)
