@@ -94,8 +94,8 @@ analytical_sr_read_only = analytical_sr[:]
 #%% :- TODO
 @numba.jit
 def softmax(x):
-    return np.exp(x) / np.sum(np.exp(x))
-import numba
+    exp_x = np.exp(x - np.max(x))
+    return exp_x / (np.sum(exp_x) + 1e-12)
 
 @numba.jit
 def position_idx(i, j, maze):
@@ -271,6 +271,8 @@ def actor_critic(state_representation, n_steps,
                     earned_rewards.append(I * reward)
                     if update_sr: # Update the state representation
                         for idx, state_idx in enumerate(trajectory):
+                            assert check_legal(maze, position_from_idx(state_idx, maze)), \
+        f"Invalid state in trajectory: {position_from_idx(state_idx, maze)}"
                             current_trajectory = trajectory[idx:]
                             state_representation[state_idx, :] = \
                                 learn_from_traj(state_representation[state_idx], 
@@ -317,10 +319,11 @@ plt.show()
 plt.plot(earned_rewards)
 plt.show()
 
-
 # Part 2, Now the same for an SR representation
 #%%
-M, V, earned_rewards = actor_critic(analytical_sr_read_only, n_steps=300, alpha=0.05, gamma=0.99, n_episodes=1000)
+M, V, earned_rewards = actor_critic(analytical_sr_read_only, 
+                                            n_steps=300, alpha=0.05, 
+                                            gamma=0.99, n_episodes=1000)
 
 #%%
 # plot state-value function
@@ -331,24 +334,21 @@ plt.show()
 plt.plot(earned_rewards)
 plt.show()
 
+@numba.jit
+def pick_random_element(arr):
+    idx = np.random.randint(0, len(arr))
+    return arr[idx]
+    
 #%%
 # Part 3
 def random_start(maze):
-    def pick_start():
-        # Suggested encoding of 2-D location onto states.
-        i, j = (1, 1)
-        while True:
-            i, j = np.random.randint(maze.shape[0]), np.random.randint(maze.shape[1])
-            if check_legal(maze, (i, j)):
-                break
-        state = position_idx(i,j, maze) 
-        return state
-    # Define yourself a function to return a random (non-wall) starting state 
-    # to pass into the actor_critic function.
-    return pick_start
-
+    free_states = np.array([position_idx(i, j, maze) 
+                        for i in range(maze.shape[0]) 
+                            for j in range(maze.shape[1]) 
+                                if check_legal(maze, (i, j))])
+    return lambda: pick_random_element(free_states)
 #%%
-plt.hist([random_start(maze)() for i in range(100000)], bins=100)
+plt.hist([random_start(maze)() for i in range(100000)],  bins=np.arange(maze.size + 1) - 0.5)
 
 #%%
 start_func = random_start(maze)
@@ -357,15 +357,13 @@ n_steps = 1000 # 300 steps per episode
 n_episodes = 5000 # 1000 episodes
 M, V, earned_rewards = actor_critic(learning_sr, n_steps, 0.05, 0.99, n_episodes,
                                        update_sr=True, start_func=start_func)
-
+#%%
 plot_maze(maze)
 plt.imshow(V.reshape(maze.shape), cmap='hot')
 plt.show()
-
 #%%
 plt.plot(earned_rewards)
 plt.show()
-
 #%%
 # Plot the SR of some states after this learning, also anything else you want.
 # TODO:-
@@ -374,16 +372,16 @@ plt.show()
 plt.plot(learning_sr[0, :])
 plt.plot(learning_sr[1, :])
 plt.imshow(learning_sr, cmap='hot')
-
 #%%
 for state_idx in range(maze.size):
-    plt.figure()
-    plt.imshow(learning_sr[state_idx, :].reshape(maze.shape), cmap='hot')
-    plt.title(f"SR for state {position_from_idx(state_idx,maze)}, goal at {goal}")
-    plt.colorbar()
-    plt.show()
-#%% Plot the SR 
+    if check_legal(maze, position_from_idx(state_idx, maze)):
+        plt.figure()
+        plt.imshow(learning_sr[state_idx, :].reshape(maze.shape), cmap='hot')
+        plt.title(f"SR for state {position_from_idx(state_idx,maze)}, goal at {goal}")
+        plt.colorbar()
+        plt.show()
 
+#%% Plot the SR 
 TODO
 goal = (5, 5)
 goal_state = goal[0]*maze.shape[1] + goal[1]
