@@ -299,7 +299,7 @@ def actor_critic(state_representation, n_steps,
             state_idx = new_state_idx 
             I *= gamma
     perf_counters["episode_counters"] = episode_counters
-    print(perf_counters)
+    #print(perf_counters)
     return M, V_weights, earned_rewards
 
 
@@ -406,20 +406,29 @@ for state_idx in range(maze.size):
         plt.show()
 
 #%% Plot the SR 
-TODO
+# TODO
 goal = (5, 5)
 goal_state = goal[0]*maze.shape[1] + goal[1]
+earned_rewards_clamped_list = []
+earned_rewards_relearned_list = []
 for i in range(20):
 
     # run with random walk SR
-    M, V, earned_rewards_clamped = actor_critic(TODO, 300, 0.05, 0.99, 400)
-    TODO
+    M, V, earned_rewards_clamped = actor_critic(analytical_sr_read_only, 300, 0.05, 0.99, 400)
+    earned_rewards_clamped_list.append(np.array(earned_rewards_clamped))
+    # TODO
+    print(f"earned_rewards_clamped[random_walk]: {earned_rewards_clamped}")
 
     # run with updated SR
-    M, V, earned_rewards_relearned = actor_critic(TODO, 300, 0.05, 0.99, 400)
-    TODO
+    learning_sr = random_walk_sr(transitions, 0.8).T
+    M, V, earned_rewards_relearned = actor_critic(learning_sr, 300, 0.05, 0.99, 400)
+    earned_rewards_relearned_list.append(np.array(earned_rewards_relearned))
+    # TODO
+    print(f"earned_rewards_relearned: {earned_rewards_relearned}")
 
-# plot the performance averages of the two types of learners
+#%%
+#%%
+# Plot the performance averages of the two types of learners
 TODO
 
 
