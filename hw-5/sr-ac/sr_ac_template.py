@@ -580,19 +580,20 @@ for label, init_func in initialization_types.items():
 # %%
 
 plt.figure(figsize=(15, 15))
-plt.plot(gaussian_filter(one_hot_earned_rewards_map[("gaussian", (10,))].mean(axis=0), 10), label="Gaussian std=5")
-plt.plot(gaussian_filter(one_hot_earned_rewards_map[("gaussian", (5,))].mean(axis=0), 10), label="Gaussian std=5")
-plt.plot(gaussian_filter(one_hot_earned_rewards_map[("gaussian", (1,))].mean(axis=0), 10), label="Gaussian std=1")
+filter_size = 7
+plt.plot(gaussian_filter(one_hot_earned_rewards_map[("gaussian", (10,))].mean(axis=0), filter_size), label="Gaussian std=5")
+plt.plot(gaussian_filter(one_hot_earned_rewards_map[("gaussian", (5,))].mean(axis=0), filter_size), label="Gaussian std=5")
+plt.plot(gaussian_filter(one_hot_earned_rewards_map[("gaussian", (1,))].mean(axis=0), filter_size), label="Gaussian std=1")
 
-plt.plot(gaussian_filter(sr_earned_rewards_map[("gaussian", (10,))].mean(axis=0), 10), label="Gaussian std=10 SR", linestyle='--')
-plt.plot(gaussian_filter(sr_earned_rewards_map[("gaussian", (5,))].mean(axis=0), 10), label="Gaussian std=5 SR", linestyle='--')
-plt.plot(gaussian_filter(sr_earned_rewards_map[("gaussian", (1,))].mean(axis=0), 10), label="Gaussian std=1 SR",linestyle='--')
+plt.plot(gaussian_filter(sr_earned_rewards_map[("gaussian", (10,))].mean(axis=0), filter_size), label="Gaussian std=10 SR", linestyle='--')
+plt.plot(gaussian_filter(sr_earned_rewards_map[("gaussian", (5,))].mean(axis=0), filter_size), label="Gaussian std=5 SR", linestyle='--')
+plt.plot(gaussian_filter(sr_earned_rewards_map[("gaussian", (1,))].mean(axis=0), filter_size), label="Gaussian std=1 SR",linestyle='--')
 
-plt.plot(gaussian_filter(one_hot_earned_rewards_map[("zeros", (0,))].mean(axis=0), 10), label="zeros 1-hot")
-plt.plot(gaussian_filter(sr_earned_rewards_map[("zeros", (0,))].mean(axis=0), 10), label="zeros SR", linestyle='--')
+plt.plot(gaussian_filter(one_hot_earned_rewards_map[("zeros", (0,))].mean(axis=0), filter_size), label="zeros 1-hot")
+plt.plot(gaussian_filter(sr_earned_rewards_map[("zeros", (0,))].mean(axis=0), filter_size), label="zeros SR", linestyle='--')
 
-plt.plot(gaussian_filter(one_hot_earned_rewards_map[("ones", (1,))].mean(axis=0), 10), label="ones 1-hot")
-plt.plot(gaussian_filter(sr_earned_rewards_map[("ones", (1,))].mean(axis=0), 10), label="ones SR", linestyle='--')
+plt.plot(gaussian_filter(one_hot_earned_rewards_map[("ones", (1,))].mean(axis=0), filter_size), label="ones 1-hot")
+plt.plot(gaussian_filter(sr_earned_rewards_map[("ones", (1,))].mean(axis=0), filter_size), label="ones SR", linestyle='--')
 
 plt.legend()
 plt.savefig("value_initialization.png")
