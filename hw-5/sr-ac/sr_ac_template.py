@@ -337,11 +337,16 @@ M, V, earned_rewards = actor_critic(np.eye(maze.size), n_steps=300,
 
 #%%
 # plot state-value function
+plt.figure(figsize=(20, 10))
 plot_maze(maze)
 plt.imshow(V.reshape(maze.shape), cmap='hot')
+plt.colorbar()
+plt.savefig("values-part-1.png")
 plt.show()
 
 plt.plot(earned_rewards)
+plt.plot(gaussian_filter(earned_rewards, 10))
+plt.savefig("earned_rewards-part-1.png")
 plt.show()
 
 # Part 2, Now the same for an SR representation
@@ -355,13 +360,20 @@ M, V, earned_rewards = actor_critic(analytical_sr,
 
 #%%
 # plot state-value function
+plt.figure(figsize=(20, 10))
 plot_maze(maze)
 plt.imshow(V.reshape(maze.shape), cmap='hot')
+plt.colorbar()
+plt.savefig("values-part-2.png")
 plt.show()
 
+#%%
 plt.plot(earned_rewards)
+plt.plot(gaussian_filter(earned_rewards, 10))
+plt.savefig("earned_rewards-part-2.png")
 plt.show()
 
+#%%
 @numba.jit
 def pick_random_element(arr):
     idx = np.random.randint(0, len(arr))
@@ -390,12 +402,17 @@ M, V, earned_rewards = actor_critic(learning_sr, n_steps, alpha, gamma, n_episod
                                        update_sr=True, start_func=start_func)
 
 #%% - TODO: The issue seems to be that the V that i am  Learning does not have differentiated values 
+plt.figure(figsize=(20, 10))
 plot_maze(maze)
 plt.title(f"State-value function : goal at {goal}")
 plt.imshow(V.reshape(maze.shape), cmap='hot')
+plt.colorbar()
+plt.savefig("values-part-3.png")
 plt.show()
 #%%
 plt.plot(earned_rewards)
+plt.plot(gaussian_filter(earned_rewards, 10))
+plt.savefig("earned_rewards-part-3.png")
 plt.show()
 
 #%%
@@ -407,7 +424,12 @@ plt.hist(V,  bins=np.arange(maze.size + 1) - 0.5)
 #%% Plot the SR 
 plt.plot(learning_sr[0, :])
 plt.plot(learning_sr[1, :])
+
+plt.figure(figsize=(20,15))
 plt.imshow(learning_sr, cmap='hot')
+plt.colorbar()
+plt.savefig("sr-part-4.png")
+
 
 #%%
 for state_idx in range(maze.size):
@@ -416,6 +438,7 @@ for state_idx in range(maze.size):
         plt.imshow(learning_sr[state_idx, :].reshape(maze.shape), cmap='hot')
         plt.title(f"SR for state {position_from_idx(state_idx,maze)}, goal at {goal}")
         plt.colorbar()
+        plt.savefig(f"sr-state-{state_idx}-part-4.png")
         plt.show()
 
 #%% Plot the SR 
