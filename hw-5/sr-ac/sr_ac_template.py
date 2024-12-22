@@ -183,7 +183,8 @@ def actor_critic(state_representation, n_steps,
                  start_func=normal_start, 
                  v_init=0,
                  goal_reach_reward=goal_value, 
-                 step_penalty=0):
+                 step_penalty=0,
+                 goal=goal):
     # Implement the actor-critic algorithm to learn to navigate the maze
     #
     # state_representation - 
@@ -217,6 +218,7 @@ def actor_critic(state_representation, n_steps,
     LEGAL_MOVES = legal_moves()
 
     episode_counters = [] 
+    
     # Iterate over episodes
     for _ in range(n_episodes):
         # Initializations
@@ -232,9 +234,9 @@ def actor_critic(state_representation, n_steps,
         I = 1
         # episode trajectory
         trajectory = []
-
+        goal_reached=False
         # Go until goal is reached
-        for _ in range(n_steps):
+        for step_idx in range(n_steps):
             perf_counters["num_steps"] += 1
             # Act and Learn (Update both M and V_weights)
            
@@ -298,6 +300,11 @@ def actor_critic(state_representation, n_steps,
             
             state_idx = new_state_idx 
             I *= gamma
+            
+        if step_idx == n_steps - 1 and not goal_reached: # Episode ended due to max steps
+            earned_rewards.append(0)
+    # mean reward 
+    earned_rewards = np.array(earned_rewards)
     perf_counters["episode_counters"] = episode_counters
     #print(perf_counters)
     return M, V_weights, earned_rewards
@@ -322,8 +329,10 @@ def learn_from_traj(succ_repr, trajectory, gamma=0.98, alpha=0.05):
 
 # Part 1
 #%%
+original_goal=(1,1)
 M, V, earned_rewards = actor_critic(np.eye(maze.size), n_steps=300, 
-                                        alpha=0.05, gamma=0.99, n_episodes=1000)
+                                        alpha=0.05, gamma=0.99, n_episodes=1000, 
+                                        goal=original_goal, start_func=normal_start)
 
 #%%
 # plot state-value function
@@ -336,9 +345,12 @@ plt.show()
 
 # Part 2, Now the same for an SR representation
 #%%
-M, V, earned_rewards = actor_critic(analytical_sr_read_only, 
+original_goal=(1,1)
+analytical_sr = random_walk_sr(transitions, 0.8).T
+M, V, earned_rewards = actor_critic(analytical_sr, 
                                             n_steps=300, alpha=0.05, 
-                                            gamma=0.99, n_episodes=1000)
+                                            gamma=0.99, n_episodes=1000,
+                                            goal=original_goal, start_func=normal_start)
 
 #%%
 # plot state-value function
@@ -407,31 +419,71 @@ for state_idx in range(maze.size):
 
 #%% Plot the SR 
 # TODO
+#%% Part-5
+"""
+How does a re-learned SR affect future policy changes? 
+
+We will now move the reward location to (5, 5). 
+
+Perform 1000 episodes of actor-critic (always starting from the 
+original starting position again), with 
+    (a) the original SR from the random walk policy,  
+    (b) the re-learned SR, which is tuned towards finding the reward at 
+        (1, 1). 
+
+Let each learner run from scratch for 20 times 
+and record how much reward was received in each episode. 
+
+To get a smoother estimate of the reward trajectory, 
+Plot the averages over the 20 episodes for each type of learner. 
+
+What do you see and how do you explain this 
+    (the difference may be somewhat subtle)?
+"""
 goal = (5, 5)
+original_goal=(1,1)
+new_goal=(5,5)
 goal_state = goal[0]*maze.shape[1] + goal[1]
-earned_rewards_clamped_list = []
-earned_rewards_relearned_list = []
+num_episodes = 1000
+earned_rewards_clamped_list = np.zeros((1000,400))
+earned_rewards_relearned_list = np.zeros((1000,400))
+
 for i in range(20):
-
     # run with random walk SR
-    M, V, earned_rewards_clamped = actor_critic(analytical_sr_read_only, 300, 0.05, 0.99, 400)
-    earned_rewards_clamped_list.append(np.array(earned_rewards_clamped))
+    analytical_sr = random_walk_sr(transitions, 0.8).T
+    M, V, earned_rewards_clamped = actor_critic(analytical_sr_read_only, num_episodes, 
+                                                    0.05, 0.99, 400, 
+                                                    goal=new_goal)
+    
+    earned_rewards_clamped_list[i] = earned_rewards_clamped
     # TODO
-    print(f"earned_rewards_clamped[random_walk]: {earned_rewards_clamped}")
-
     # run with updated SR
-    learning_sr = random_walk_sr(transitions, 0.8).T
-    M, V, earned_rewards_relearned = actor_critic(learning_sr, 300, 0.05, 0.99, 400)
-    earned_rewards_relearned_list.append(np.array(earned_rewards_relearned))
-    # TODO
-    print(f"earned_rewards_relearned: {earned_rewards_relearned}")
+    re_learning_sr = random_walk_sr(transitions, 0.8).T
+    # train to original goal
+    M, V, earned_rewards_relearned = actor_critic(re_learning_sr, num_episodes, 
+                                                    0.05, 0.99, 400,
+                                                    update_sr=True,
+                                                    goal=original_goal)
+    # Learn new goal. 
+    M, V, earned_rewards_relearned = actor_critic(re_learning_sr, num_episodes, 
+                                                    0.05, 0.99, 400, 
+                                                    update_sr=True,
+                                                    goal=new_goal)
+    
+    earned_rewards_relearned_list[i] = earned_rewards_relearned
 
 #%%
 #%%
 # Plot the performance averages of the two types of learners
-TODO
+avg_clamped = [earned_rewards_clamped_list[:,i].mean() for i in range(400)]
+avg_relearned = [earned_rewards_relearned_list[:,i].mean() for i in range(400)]
 
 
+plt.figure(figsize=(10, 10))
+plt.plot(avg_clamped, label='clamped')
+plt.plot(avg_relearned, label='relearned')
+plt.legend()
+#%%
 # Part 5
 
 # reset goal
