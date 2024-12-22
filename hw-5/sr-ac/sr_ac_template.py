@@ -287,7 +287,7 @@ def actor_critic(state_representation, n_steps,
             
             # Absorbing state  
             if (i, j) == goal: 
-                earned_rewards.append(I * reward)
+                earned_rewards.append(I * reward) # earned rewards for this episode
                 if update_sr: # Update the state representation
                     for idx, state_idx in enumerate(trajectory):
                         assert check_legal(maze, position_from_idx(state_idx, maze)), \
@@ -445,14 +445,16 @@ original_goal=(1,1)
 new_goal=(5,5)
 goal_state = goal[0]*maze.shape[1] + goal[1]
 num_episodes = 1000
-earned_rewards_clamped_list = np.zeros((1000,400))
-earned_rewards_relearned_list = np.zeros((1000,400))
+num_steps = 400
+earned_rewards_clamped_list = np.zeros((20,400, 1000))
+earned_rewards_relearned_list = np.zeros((20,400,1000))
 
 for i in range(20):
     # run with random walk SR
     analytical_sr = random_walk_sr(transitions, 0.8).T
-    M, V, earned_rewards_clamped = actor_critic(analytical_sr_read_only, num_episodes, 
-                                                    0.05, 0.99, 400, 
+    M, V, earned_rewards_clamped = actor_critic(analytical_sr_read_only, 
+                                                num_steps, 
+                                                    0.05, 0.99, num_episodes, 
                                                     goal=new_goal)
     
     earned_rewards_clamped_list[i] = earned_rewards_clamped
@@ -460,13 +462,13 @@ for i in range(20):
     # run with updated SR
     re_learning_sr = random_walk_sr(transitions, 0.8).T
     # train to original goal
-    M, V, earned_rewards_relearned = actor_critic(re_learning_sr, num_episodes, 
-                                                    0.05, 0.99, 400,
+    M, V, earned_rewards_relearned = actor_critic(re_learning_sr, num_steps, 
+                                                    0.05, 0.99, num_episodes,
                                                     update_sr=True,
                                                     goal=original_goal)
     # Learn new goal. 
-    M, V, earned_rewards_relearned = actor_critic(re_learning_sr, num_episodes, 
-                                                    0.05, 0.99, 400, 
+    M, V, earned_rewards_relearned = actor_critic(re_learning_sr, num_steps, 
+                                                    0.05, 0.99, num_episodes, 
                                                     update_sr=True,
                                                     goal=new_goal)
     
@@ -474,12 +476,12 @@ for i in range(20):
 
 #%%
 #%%
+# 20 - number of trials, 1000 number of episodes, 400 - number of steps
 # Plot the performance averages of the two types of learners
-avg_clamped = [earned_rewards_clamped_list[:,i].mean() for i in range(400)]
-avg_relearned = [earned_rewards_relearned_list[:,i].mean() for i in range(400)]
+avg_clamped = earned_rewards_clamped_list.mean(axis=1).mean(axis=0)
+avg_relearned = earned_rewards_relearned_list.mean(axis=1).mean(axis=0)
 
-
-plt.figure(figsize=(10, 10))
+plt.figure(figsize=(15, 15))
 plt.plot(avg_clamped, label='clamped')
 plt.plot(avg_relearned, label='relearned')
 plt.legend()
