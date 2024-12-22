@@ -2,6 +2,7 @@
 import numba
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter
 
 #%%
 # Define maze
@@ -446,11 +447,11 @@ new_goal=(5,5)
 goal_state = goal[0]*maze.shape[1] + goal[1]
 num_episodes = 1000
 num_steps = 400
-earned_rewards_clamped_list = np.zeros((20,400, 1000))
-earned_rewards_relearned_list = np.zeros((20,400,1000))
+earned_rewards_clamped_list = np.zeros((20, 400, 1000))
+earned_rewards_relearned_list = np.zeros((20, 400, 1000))
 
 for i in range(20):
-    # run with random walk SR
+    # Run with random-walk SR.
     analytical_sr = random_walk_sr(transitions, 0.8).T
     M, V, earned_rewards_clamped = actor_critic(analytical_sr_read_only, 
                                                 num_steps, 
@@ -458,19 +459,17 @@ for i in range(20):
                                                     goal=new_goal)
     
     earned_rewards_clamped_list[i] = earned_rewards_clamped
-    # TODO
-    # run with updated SR
+
+    # TODO: Run with updated SR.
     re_learning_sr = random_walk_sr(transitions, 0.8).T
-    # train to original goal
+    # Train to original goal
     M, V, earned_rewards_relearned = actor_critic(re_learning_sr, num_steps, 
                                                     0.05, 0.99, num_episodes,
-                                                    update_sr=True,
-                                                    goal=original_goal)
+                                                    update_sr=True, goal=original_goal)
     # Learn new goal. 
     M, V, earned_rewards_relearned = actor_critic(re_learning_sr, num_steps, 
                                                     0.05, 0.99, num_episodes, 
-                                                    update_sr=True,
-                                                    goal=new_goal)
+                                                    update_sr=True, goal=new_goal)
     
     earned_rewards_relearned_list[i] = earned_rewards_relearned
 
@@ -488,7 +487,7 @@ plt.legend()
 #%%
 # Part 5
 """
-Lastly, we will study how value intialization can aid in the learning of a
+Lastly, we will study how value initialization can aid in the learning of a
 policy. 
 
 The reward location is back at (1, 1), we always start at the 
@@ -498,30 +497,105 @@ representation.
 So far, we have initialized our weights w with 0. 
 
 Experiment with different initializations:
-    along with both the 1-hot representation
-and the SR. 
+    along with both the 
+        - 1-hot representation
+        - SR. 
 
 Try a couple of representative points (like 4-5 different values)
-from 0 to 90 as your intialization. 
+from 0 to 90 as your initialization. 
 
 What do you observe, why do you think some values help while others hurt?
 """
 
-# reset goal
+# Reset Goal
 goal = (1, 1)
-goal_state = goal[0]*maze.shape[1] + goal[1]
+goal_state = position_idx(goal[0], goal[1], maze)
 
-# run some learners with different value weight w initializations
+#%%
+# Run some learners with different value weight w initializations.
+def gaussian_value_initialization(maze, goal, goal_value, std):
+    """
+    Maze represents the map of the environment. Goal represents the
+    rewarding goal state, while goal value is the value of the goal state. 
+    
+    We set the mean of the 2-d gaussian distribution to the goal value, and 
+    the standard deviation to std.
+    """
+    cols, rows = maze.shape
+    # Create a grid of coordinates
+    x, y = np.meshgrid(np.arange(rows), np.arange(cols))
+    
+    # Compute the Gaussian distribution centered at the goal
+    goal_x, goal_y = goal
+    value_weights = goal_value * np.exp(-((x - goal_x)**2 + (y - goal_y)**2) / (2 * std**2))
+    print(value_weights.shape)
+    retval = np.zeros(maze.size)
+    for state_idx in range(maze.size):
+        retval[state_idx] = value_weights[position_from_idx(state_idx, maze)[0], 
+                                          position_from_idx(state_idx, maze)[1]]
+    return retval 
 
-TODO
-for v_inits in [TODO]:
-    TODO
-    for i in range(12):
+plot_maze(maze)
+plt.imshow(gaussian_value_initialization(maze, goal, goal_value, 5).reshape(maze.shape), cmap='hot') 
+ 
+#%%
+# TODO
+initialization_types = {
+    "gaussian": lambda std: gaussian_value_initialization(maze, goal, goal_value, std),
+    "zeros": lambda args: np.zeros(maze.size),
+    "ones": lambda args: np.ones(maze.size),
+}
 
-        M, V, earned_rewards = actor_critic(TODO, 300, 0.05, 0.99, 400)
-        TODO
-        M, V, earned_rewards = actor_critic(TODO, 300, 0.05, 0.99, 400)
-        TODO
+initialization_type_args = {
+    "gaussian": [(1,), (5,), (10,)],
+    "zeros": [(0,)],
+    "ones": [(1,)],
+}
 
+legend_templates = {
+    "gaussian": "Gaussian std={}",
+    "zeros": "Zeros",
+    "ones": "Ones",
+}
+
+one_hot_earned_rewards_map = {}
+sr_earned_rewards_map = {}
+
+for label, init_func in initialization_types.items():
+    for args in initialization_type_args[label]:
+        print(f"Running {label} with args {args}")
+        v_init = init_func(*args)
+        one_hot_earned_rewards = np.zeros((12,400))
+        sr_earned_rewards = np.zeros((12,400))
+        for i in range(12):
+            M, V, earned_rewards = actor_critic(np.eye(maze.size), 300, 0.05, 0.99, 400, v_init=v_init, goal=goal)
+            print("shape:",earned_rewards.shape)
+            one_hot_earned_rewards[i] = earned_rewards
+            analytical_sr = random_walk_sr(transitions, 0.8).T
+            M, V, earned_rewards = actor_critic(analytical_sr, 300, 0.05, 0.99, 400, v_init=v_init, update_sr=True, goal=goal)
+            sr_earned_rewards[i] = earned_rewards
+        one_hot_earned_rewards_map[(label, args)] = one_hot_earned_rewards
+        sr_earned_rewards_map[(label, args)] = sr_earned_rewards 
 # plot the resulting learning curves
+# %%
+
+plt.figure(figsize=(15, 15))
+plt.plot(gaussian_filter(one_hot_earned_rewards_map[("gaussian", (10,))].mean(axis=0), 10), label="Gaussian std=5")
+plt.plot(gaussian_filter(one_hot_earned_rewards_map[("gaussian", (5,))].mean(axis=0), 10), label="Gaussian std=5")
+plt.plot(gaussian_filter(one_hot_earned_rewards_map[("gaussian", (1,))].mean(axis=0), 10), label="Gaussian std=1")
+
+plt.plot(gaussian_filter(sr_earned_rewards_map[("gaussian", (10,))].mean(axis=0), 10), label="Gaussian std=10 SR", linestyle='--')
+plt.plot(gaussian_filter(sr_earned_rewards_map[("gaussian", (5,))].mean(axis=0), 10), label="Gaussian std=5 SR", linestyle='--')
+plt.plot(gaussian_filter(sr_earned_rewards_map[("gaussian", (1,))].mean(axis=0), 10), label="Gaussian std=1 SR",linestyle='--')
+
+plt.plot(gaussian_filter(one_hot_earned_rewards_map[("zeros", (0,))].mean(axis=0), 10), label="zeros 1-hot")
+plt.plot(gaussian_filter(sr_earned_rewards_map[("zeros", (0,))].mean(axis=0), 10), label="zeros SR", linestyle='--')
+
+plt.plot(gaussian_filter(one_hot_earned_rewards_map[("ones", (1,))].mean(axis=0), 10), label="ones 1-hot")
+plt.plot(gaussian_filter(sr_earned_rewards_map[("ones", (1,))].mean(axis=0), 10), label="ones SR", linestyle='--')
+
+plt.legend()
+plt.savefig("value_initialization.png")
+## %%
+
 # %%
