@@ -487,6 +487,25 @@ plt.plot(avg_relearned, label='relearned')
 plt.legend()
 #%%
 # Part 5
+"""
+Lastly, we will study how value intialization can aid in the learning of a
+policy. 
+
+The reward location is back at (1, 1), we always start at the 
+original starting position, and use the SR from a random-walk policy as our
+representation. 
+
+So far, we have initialized our weights w with 0. 
+
+Experiment with different initializations:
+    along with both the 1-hot representation
+and the SR. 
+
+Try a couple of representative points (like 4-5 different values)
+from 0 to 90 as your intialization. 
+
+What do you observe, why do you think some values help while others hurt?
+"""
 
 # reset goal
 goal = (1, 1)
