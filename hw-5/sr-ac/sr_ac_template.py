@@ -1,8 +1,21 @@
 #%%
+import os
 import numba
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns 
 from scipy.ndimage import gaussian_filter
+
+sns.set_theme()
+#%%
+# Get the directory of the current file uponelevel
+current_dir = os.path.dirname(__file__).split("/")[-2] 
+
+# Specify a relative directory for saving figures
+output_dir = os.path.join(current_dir, "images")
+os.makedirs(output_dir, exist_ok=True)
+
+IMAGE_PATH = output_dir
 
 #%%
 # Define maze
@@ -182,7 +195,7 @@ def actor_critic(state_representation, n_steps,
                  n_episodes, 
                  update_sr=False, 
                  start_func=normal_start, 
-                 v_init=0,
+                 v_init=None,
                  goal_reach_reward=goal_value, 
                  step_penalty=0,
                  goal=goal):
@@ -212,18 +225,16 @@ def actor_critic(state_representation, n_steps,
     # Initialize state-value function
     num_states = state_representation.shape[0]
     # w - weights for the value function
-    V_weights = np.zeros(num_states) # TODO
-    #
-    earned_rewards = [] # TODO
+    V_weights = np.zeros(num_states) if v_init is None else v_init 
+    episode_rewards = np.zeros(n_episodes) # TODO
 
     LEGAL_MOVES = legal_moves()
 
     episode_counters = [] 
     
     # Iterate over episodes
-    for _ in range(n_episodes):
+    for episode_idx in range(n_episodes):
         # Initializations
-        # TODO
         # Move to the start state/possibly random start state
         per_episode_counters = {} 
         per_episode_counters["state_visit_counts"] = np.zeros(num_states)
@@ -288,7 +299,7 @@ def actor_critic(state_representation, n_steps,
             
             # Absorbing state  
             if (i, j) == goal: 
-                earned_rewards.append(I * reward) # earned rewards for this episode
+                episode_rewards[episode_idx] = I * reward # earned rewards for this episode
                 if update_sr: # Update the state representation
                     for idx, state_idx in enumerate(trajectory):
                         assert check_legal(maze, position_from_idx(state_idx, maze)), \
@@ -301,14 +312,14 @@ def actor_critic(state_representation, n_steps,
             
             state_idx = new_state_idx 
             I *= gamma
-            
-        if step_idx == n_steps - 1 and not goal_reached: # Episode ended due to max steps
-            earned_rewards.append(0)
-    # mean reward 
-    earned_rewards = np.array(earned_rewards)
+        # Episode ended due to max steps 
+        if step_idx == n_steps - 1 and not goal_reached: 
+            episode_rewards[episode_idx] = 0
+    # Reward only for reaching the goal, thus episode reward is 
+    # same as Discounted last step reward.
     perf_counters["episode_counters"] = episode_counters
     #print(perf_counters)
-    return M, V_weights, earned_rewards
+    return M, V_weights, episode_rewards
 
 
 #%%
@@ -335,18 +346,23 @@ M, V, earned_rewards = actor_critic(np.eye(maze.size), n_steps=300,
                                         alpha=0.05, gamma=0.99, n_episodes=1000, 
                                         goal=original_goal, start_func=normal_start)
 
+part_1_one_hot_earned_rewards = earned_rewards
 #%%
 # plot state-value function
-plt.figure(figsize=(20, 10))
+plt.figure(figsize=(10, 5))
+plt.title(f'V(s): Goal {original_goal} Start {start}')
 plot_maze(maze)
 plt.imshow(V.reshape(maze.shape), cmap='hot')
 plt.colorbar()
-plt.savefig("values-part-1.png")
+plt.savefig(f"{IMAGE_PATH}/values-part-1.png")
 plt.show()
 
+plt.figure(figsize=(10,5))
+plt.title('Earned Discounted Rewards 1-Hot State Representation')
 plt.plot(earned_rewards)
-plt.plot(gaussian_filter(earned_rewards, 10))
-plt.savefig("earned_rewards-part-1.png")
+plt.plot(gaussian_filter(earned_rewards, 50), label='Rewards Smoothed')
+plt.legend()
+plt.savefig(f"{IMAGE_PATH}/earned_rewards-part-1.png")
 plt.show()
 
 # Part 2, Now the same for an SR representation
@@ -356,21 +372,28 @@ analytical_sr = random_walk_sr(transitions, 0.8).T
 M, V, earned_rewards = actor_critic(analytical_sr, 
                                             n_steps=300, alpha=0.05, 
                                             gamma=0.99, n_episodes=1000,
-                                            goal=original_goal, start_func=normal_start)
+                                            goal=original_goal, 
+                                            start_func=normal_start)
 
+part_2_sr_random_policy_earned_rewards = earned_rewards
 #%%
 # plot state-value function
-plt.figure(figsize=(20, 10))
+plt.figure(figsize=(10, 5))
 plot_maze(maze)
+plt.title(f"V(s): goal at {goal} start at {start}")
 plt.imshow(V.reshape(maze.shape), cmap='hot')
 plt.colorbar()
-plt.savefig("values-part-2.png")
+plt.savefig(f"{IMAGE_PATH}/values-part-2.png")
 plt.show()
 
 #%%
+plt.figure(figsize=(10, 5))
 plt.plot(earned_rewards)
-plt.plot(gaussian_filter(earned_rewards, 10))
-plt.savefig("earned_rewards-part-2.png")
+plt.plot(gaussian_filter(earned_rewards, 50), label='SR')
+plt.plot(gaussian_filter(part_1_one_hot_earned_rewards, 50), label='1-Hot')
+#plt.plot(gaussian_filter(np.square(part_1_one_hot_earned_rewards - earned_rewards), 2), label='Delta')
+plt.legend()
+plt.savefig(f"{IMAGE_PATH}/earned_rewards-part-2.png")
 plt.show()
 
 #%%
@@ -398,21 +421,30 @@ n_episodes = 1000 # 1000 episodes
 alpha = 0.05
 gamma = 0.99
 
-M, V, earned_rewards = actor_critic(learning_sr, n_steps, alpha, gamma, n_episodes,
-                                       update_sr=True, start_func=start_func)
+M, V, earned_rewards = actor_critic(learning_sr, 
+                                        n_steps, 
+                                        alpha, 
+                                        gamma, 
+                                        n_episodes,
+                                        update_sr=True, start_func=start_func)
+part_3_random_start_sr = earned_rewards
 
-#%% - TODO: The issue seems to be that the V that i am  Learning does not have differentiated values 
-plt.figure(figsize=(20, 10))
+#%%
+plt.figure(figsize=(10, 5))
 plot_maze(maze)
 plt.title(f"State-value function : goal at {goal}")
 plt.imshow(V.reshape(maze.shape), cmap='hot')
 plt.colorbar()
-plt.savefig("values-part-3.png")
+plt.savefig(f"{IMAGE_PATH}/values-part-3.png")
 plt.show()
 #%%
+plt.figure(figsize=(10, 5))
 plt.plot(earned_rewards)
-plt.plot(gaussian_filter(earned_rewards, 10))
-plt.savefig("earned_rewards-part-3.png")
+plt.plot(gaussian_filter(earned_rewards, 50), label='random-start-sr')
+plt.plot(gaussian_filter(part_2_sr_random_policy_earned_rewards, 50),label='fixed-start-sr')
+plt.plot(gaussian_filter(part_1_one_hot_earned_rewards, 50), label='fixed-start-1-hot')
+plt.legend()
+plt.savefig(f"{IMAGE_PATH}/earned_rewards-part-3.png")
 plt.show()
 
 #%%
