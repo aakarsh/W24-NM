@@ -260,12 +260,15 @@ def actor_critic(state_representation, n_steps,
                 # Compute action probabilities
                 action_probabilities = softmax(M[state_idx, :])
                 valid_actions = np.where(M[state_idx, :] > -np.inf)[0]
-                 
                 valid_probabilities = action_probabilities[valid_actions]
                 valid_probabilities /= valid_probabilities.sum()  # Normalize probabilities
-                chosen_action = np.random.choice(valid_actions, p=valid_probabilities)
+                if(np.isnan(valid_probabilities).any()) and len(valid_probabilities) > 0:
+                   chosen_action = np.random.choice(4)  
+                else:
+                    chosen_action = np.random.choice(valid_actions, p=valid_probabilities)
                 # Choose action according to action probabilities
-                # chosen_action = np.random.choice(4, p=action_probabilities)
+                #action_probabilities = np.nan_to_num(action_probabilities, nan=-np.inf, copy=False)
+                #chosen_action = np.random.choice(4, p=action_probabilities)
                 # take action
                 move = LEGAL_MOVES[chosen_action]
                 new_state = tuple(np.array(position_from_idx(state_idx, maze)) + np.array(move))
@@ -278,7 +281,7 @@ def actor_critic(state_representation, n_steps,
                     per_episode_counters["actions"] = per_episode_counters.get("actions", 0) + 1
         
             per_episode_counters["state_visit_counts"][state_idx] += 1 
-            
+            trajectory.append(new_state_idx)
             V_state = V_weights @ state_representation[state_idx]
             goal_reached = new_state == goal   
             # Compute the value of the new state, goal-state has value 0 
@@ -301,13 +304,17 @@ def actor_critic(state_representation, n_steps,
             if (i, j) == goal: 
                 episode_rewards[episode_idx] = I * reward # earned rewards for this episode
                 if update_sr: # Update the state representation
+                    #new_state_representation = np.copy(state_representation)
+                    trajectory = np.array(trajectory)
                     for idx, state_idx in enumerate(trajectory):
-                        assert check_legal(maze, position_from_idx(state_idx, maze)), \
-    f"Invalid state in trajectory: {position_from_idx(state_idx, maze)}"
+                        #assert check_legal(maze, position_from_idx(state_idx, maze)), \ f"Invalid state in trajectory: {position_from_idx(state_idx, maze)}"
+                        #print("state_idx", state_idx)
                         current_trajectory = trajectory[idx:]
                         state_representation[state_idx, :] = \
-                            learn_from_traj(state_representation[state_idx], 
+                            learn_from_traj(state_representation[state_idx,:], 
                                             current_trajectory, gamma, alpha)
+                    #state_representation[:] = new_state_representation
+                    
                 break # END EPISODE
             
             state_idx = new_state_idx 
@@ -315,12 +322,23 @@ def actor_critic(state_representation, n_steps,
         # Episode ended due to max steps 
         if step_idx == n_steps - 1 and not goal_reached: 
             episode_rewards[episode_idx] = 0
+            if update_sr: # Update the state representation
+                #new_state_representation = np.copy(state_representation)
+                trajectory = np.array(trajectory)
+                for idx, state_idx in enumerate(trajectory):
+                    #print("state_idx", state_idx)
+                    #assert check_legal(maze, position_from_idx(state_idx, maze)), \ f"Invalid state in trajectory: {position_from_idx(state_idx, maze)}"
+                    current_trajectory = trajectory[idx:]
+                    state_representation[state_idx, :] = \
+                        learn_from_traj(state_representation[state_idx,:], 
+                                        current_trajectory, gamma, alpha)
+                #state_representation[:] = new_state_representation
+ 
     # Reward only for reaching the goal, thus episode reward is 
     # same as Discounted last step reward.
     perf_counters["episode_counters"] = episode_counters
     #print(perf_counters)
     return M, V_weights, episode_rewards
-
 
 #%%
 # One part to the solution of exercise part 3, if you want to update the 
@@ -334,7 +352,11 @@ def learn_from_traj(succ_repr, trajectory, gamma=0.98, alpha=0.05):
     observed = np.zeros_like(succ_repr)
     for i, state in enumerate(trajectory):
         observed[state] += gamma ** i
-    succ_repr += alpha * (observed - succ_repr)
+    delta =  observed - succ_repr
+    #print(f"successor: {succ_repr}, observed: {observed}, delta:{delta}")
+    if np.sum(np.abs(delta)) >0 : 
+        print("non-zero-delta: ", np.sum(np.abs(delta)))
+    succ_repr += alpha * delta 
     # Return the updated successor representation
     return succ_repr
 
@@ -426,7 +448,8 @@ M, V, earned_rewards = actor_critic(learning_sr,
                                         alpha, 
                                         gamma, 
                                         n_episodes,
-                                        update_sr=True, start_func=start_func)
+                                        update_sr=True, 
+                                        start_func=start_func)
 part_3_random_start_sr = earned_rewards
 
 #%%
@@ -440,9 +463,9 @@ plt.show()
 #%%
 plt.figure(figsize=(10, 5))
 plt.plot(earned_rewards)
-plt.plot(gaussian_filter(earned_rewards, 50), label='random-start-sr')
-plt.plot(gaussian_filter(part_2_sr_random_policy_earned_rewards, 50),label='fixed-start-sr')
-plt.plot(gaussian_filter(part_1_one_hot_earned_rewards, 50), label='fixed-start-1-hot')
+plt.plot(gaussian_filter(earned_rewards, 10), label='random-start-sr')
+plt.plot(gaussian_filter(part_2_sr_random_policy_earned_rewards, 10),label='fixed-start-sr')
+plt.plot(gaussian_filter(part_1_one_hot_earned_rewards, 10), label='fixed-start-1-hot')
 plt.legend()
 plt.savefig(f"{IMAGE_PATH}/earned_rewards-part-3.png")
 plt.show()
@@ -452,7 +475,6 @@ plt.hist(V,  bins=np.arange(maze.size + 1) - 0.5)
 
 #%%
 # Plot the SR of some states after this learning, also anything else you want.
-# TODO:- # Part 4
 #%% Plot the SR 
 plt.plot(learning_sr[0, :])
 plt.plot(learning_sr[1, :])
@@ -463,14 +485,18 @@ plt.colorbar()
 plt.savefig("sr-part-4.png")
 
 
+original_random_walk_sr = np.copy(random_walk_sr(transitions, 0.8).T)
 #%%
 for state_idx in range(maze.size):
     if check_legal(maze, position_from_idx(state_idx, maze)):
         plt.figure()
+        delta = learning_sr[state_idx, :].reshape(maze.shape) - original_random_walk_sr[state_idx, :].reshape(maze.shape)
+        total_error = np.sum(np.square(delta))
         plt.imshow(learning_sr[state_idx, :].reshape(maze.shape), cmap='hot')
-        plt.title(f"SR for state {position_from_idx(state_idx,maze)}, goal at {goal}")
+        #plt.imshow(delta, cmap='hot')
+        plt.title(f"SR for state {position_from_idx(state_idx,maze)} Error:{total_error:.2f}")
         plt.colorbar()
-        plt.savefig(f"sr-state-{state_idx}-part-4.png")
+        plt.savefig(f"{IMAGE_PATH}/sr-state-{state_idx}-part-4.png")
         plt.show()
 
 # TODO: Ornsen-uhlenbeck Exploration Based Values
