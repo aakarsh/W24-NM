@@ -8,15 +8,18 @@ from scipy.ndimage import gaussian_filter
 
 sns.set_theme()
 #%%
-# Get the directory of the current file uponelevel
-current_dir = os.path.dirname(__file__).split("/")[-2] 
-
+#%%
+# Get the absolute path of the current file
+absolute_path = os.path.abspath(__file__)
+# Get the directory of the current file, one level up
+current_dir = os.path.dirname(absolute_path)  # Current file's directory
+parent_dir = os.path.dirname(current_dir)    # One level up
 # Specify a relative directory for saving figures
 output_dir = os.path.join(current_dir, "images")
+
 os.makedirs(output_dir, exist_ok=True)
-
 IMAGE_PATH = output_dir
-
+print(f"Using image path: {IMAGE_PATH}")
 #%%
 # Define maze
 maze = np.zeros((9, 13))
@@ -170,20 +173,6 @@ def init_propensities(maze, epsilon = 1e-5):
                 M[position_idx(i, j, maze), action] = epsilon
     return M
 #%%
-def plot_propensities(M, maze):
-    # Plot the propensities for each state
-    plt.figure(figsize=(10, 5))
-    plt.title('Action Propensities')
-    
-    for move_name in legal_move_names():
-        plt.figure(figsize=(10, 5))
-        plt.title(f'Action Propensities for {move_name}')
-        plot_maze(maze)
-        plt.imshow(M[:, legal_move_names().index(move_name)].reshape(maze.shape), cmap='hot')
-        plt.colorbar()
-        plt.show() 
-        
-#%%
 """
 Learning to act
 
@@ -297,28 +286,27 @@ def actor_critic(state_representation, n_steps,
                 # chosen_action = np.random.choice(valid_actions, p=valid_probabilities)
                 
                 action_probabilities = softmax(M[state_idx, :])
-                #valid_actions = np.where(M[state_idx, :] > -np.inf)[0]
                 valid_probabilities = action_probabilities[valid_actions]
                 if valid_probabilities.sum() == 0:
                         print(f"Warning: Sum of probabilities is zero for state {state_idx} - {position_from_idx(state_idx, maze)}")
                         valid_probabilities = np.ones_like(valid_probabilities) / len(valid_probabilities)
                 else:
                         valid_probabilities /= valid_probabilities.sum()
-               
-                if(np.isnan(valid_probabilities).any()) and len(valid_probabilities) > 0:
-                   chosen_action = np.random.choice(4)
-                else:
-                    try:
-                        chosen_action = np.random.choice(valid_actions, p=valid_probabilities)
-                    except ValueError:
-                        print("valid_actions:", valid_actions)
-                        print("valid_probabilities:", valid_probabilities)
-                        print("action_probabilities:", action_probabilities)
-                        print("M[state_idx, :]:", M[state_idx, :])
-                        print("state representation:", state_representation[state_idx])
-                        print("v_weights:", V_weights)
-                        plt.imshow(state_representation, cmap='hot')
-                        raise ValueError("ValueError")
+                # Ensure that the probabilities of invalid actions are zero 
+                for i in range(len(action_probabilities)):
+                    if i not in set(valid_actions):
+                        action_probabilities[i] = 1e-9  # small value
+                try:
+                    chosen_action = np.random.choice(valid_actions, p=valid_probabilities)
+                except ValueError:
+                    print("valid_actions:", valid_actions)
+                    print("valid_probabilities:", valid_probabilities)
+                    print("action_probabilities:", action_probabilities)
+                    print("M[state_idx, :]:", M[state_idx, :])
+                    print("state representation:", state_representation[state_idx])
+                    print("v_weights:", V_weights)
+                    plt.imshow(state_representation, cmap='hot')
+                    raise ValueError("ValueError")
                 # Choose action according to action probabilities
                 #action_probabilities = np.nan_to_num(action_probabilities, nan=-np.inf, copy=False)
                 #chosen_action = np.random.choice(4, p=action_probabilities)
@@ -353,7 +341,7 @@ def actor_critic(state_representation, n_steps,
             # V(s) = X(s) \cdot w || V(s) = 0 if s is goal
             V_new_state = V_weights @ state_representation[new_state_idx]  \
                 if not goal_reached else 0
-            #  
+            # 
             V_diff = ( gamma * V_new_state ) - V_state 
             reward = goal_reach_reward if goal_reached else step_penalty
             # TD error 
@@ -506,34 +494,10 @@ def test_update_sr_after_episode():
         "Test failed: SR update for state 0 does not match expected values"
     assert np.allclose(actual_sr_2, expected_sr_2), \
         "Test failed: SR update for state 0 does not match expected values"
-     
     print("Test passed!")
 
 test_update_sr_after_episode()
 #%%
-def test_update_sr_after_episode():
-    state_representation =  random_walk_sr(transitions, 0.8).T 
-    old_state_representation = np.copy(state_representation)
-    trajectory = [
-                  position_idx(7, 7, maze), 
-                  position_idx(6, 7, maze), 
-                  position_idx(5, 7, maze), 
-                  position_idx(4, 7, maze), 
-                  position_idx(3, 7, maze),
-                  #position_idx(2, 7, maze),
-                   #position_idx(1, 7, maze)
-                  ]
-    gamma = 0.98
-    alpha = 0.05
-    
-    updated_sr = update_sr_after_episode(state_representation, trajectory, gamma, alpha, debug=False)
-    assert not np.allclose(updated_sr, old_state_representation)
-    diff_for_5_7 = np.sum(np.abs(old_state_representation[position_idx(5, 7, maze),:] - updated_sr[position_idx(5, 7, maze), :]))
-    # print("diff_for_5_7", diff_for_5_7)
-    assert diff_for_5_7 >=  gamma * alpha
-    return updated_sr 
-
-test_update_sr_after_episode()
 # Part 1
 #%%
 original_goal=(1,1)
@@ -675,7 +639,7 @@ for state_idx in range(maze.size):
 # TODO: Ornsen-uhlenbeck Exploration Based Values
 #%% Plot the SR 
 # TODO
-#%% Part-5
+#%% Part-4
 """
 How does a re-learned SR affect future policy changes? 
 
@@ -715,30 +679,33 @@ for i in range(20):
     
     earned_rewards_clamped_list[i] = earned_rewards_clamped
 
-    # TODO: Run with updated SR.
-    re_learning_sr = random_walk_sr(transitions, 0.8).T
-    # Train to original goal
-    M, V, earned_rewards_relearned = actor_critic(re_learning_sr, num_steps, 
-                                                    0.05, 0.99, num_episodes,
-                                                    update_sr=True, goal=original_goal)
-    # Learn new goal. 
-    M, V, earned_rewards_relearned = actor_critic(re_learning_sr, num_steps, 
-                                                    0.05, 0.99, num_episodes, 
-                                                    update_sr=True, goal=new_goal)
+    if False:
+        # TODO: Run with updated SR.
+        re_learning_sr = random_walk_sr(transitions, 0.8).T
+        # Train to original goal
+        M, V, earned_rewards_relearned = actor_critic(re_learning_sr, num_steps, 
+                                                        0.05, 0.99, num_episodes,
+                                                        update_sr=True, goal=original_goal)
+        # Learn new goal. 
+        M, V, earned_rewards_relearned = actor_critic(re_learning_sr, num_steps, 
+                                                        0.05, 0.99, num_episodes, 
+                                                        update_sr=True, goal=new_goal)
     
-    earned_rewards_relearned_list[i] = earned_rewards_relearned
+        earned_rewards_relearned_list[i] = earned_rewards_relearned
 
 #%%
 #%%
 # 20 - number of trials, 1000 number of episodes, 400 - number of steps
 # Plot the performance averages of the two types of learners
 avg_clamped = earned_rewards_clamped_list.mean(axis=1).mean(axis=0)
-avg_relearned = earned_rewards_relearned_list.mean(axis=1).mean(axis=0)
+#avg_relearned = earned_rewards_relearned_list.mean(axis=1).mean(axis=0)
 
-plt.figure(figsize=(15, 15))
+plt.figure(figsize=(10, 5))
 plt.plot(avg_clamped, label='clamped')
-plt.plot(avg_relearned, label='relearned')
+#plt.plot(avg_relearned, label='relearned')
 plt.legend()
+plt.savefig(f"{IMAGE_PATH}/earned_rewards-part-4.png")
+plt.show()
 #%%
 # Part 5
 """
@@ -759,9 +726,10 @@ Experiment with different initializations:
 Try a couple of representative points (like 4-5 different values)
 from 0 to 90 as your initialization. 
 
-What do you observe, why do you think some values help while others hurt?
-"""
+What do you observe, why do you think some values help 
+while others hurt?
 
+"""
 # Reset Goal
 goal = (1, 1)
 goal_state = position_idx(goal[0], goal[1], maze)
@@ -797,20 +765,17 @@ plt.imshow(gaussian_value_initialization(maze, goal, goal_value, 5).reshape(maze
 # TODO
 initialization_types = {
     "gaussian": lambda std: gaussian_value_initialization(maze, goal, goal_value, std),
-    "zeros": lambda args: np.zeros(maze.size),
-    "ones": lambda args: np.ones(maze.size),
+    "constant": lambda args: np.ones(maze.size)*args[0],
 }
 
 initialization_type_args = {
     "gaussian": [(1,), (5,), (10,)],
-    "zeros": [(0,)],
-    "ones": [(1,)],
+    "constant": [(0,), (1,), (5,), (10,), (20,), (50,), (90,)],
 }
 
 legend_templates = {
     "gaussian": "Gaussian std={}",
-    "zeros": "Zeros",
-    "ones": "Ones",
+    "constant": "Constant",
 }
 
 one_hot_earned_rewards_map = {}
@@ -827,7 +792,7 @@ for label, init_func in initialization_types.items():
             print("shape:",earned_rewards.shape)
             one_hot_earned_rewards[i] = earned_rewards
             analytical_sr = random_walk_sr(transitions, 0.8).T
-            M, V, earned_rewards = actor_critic(analytical_sr, 300, 0.05, 0.99, 400, v_init=v_init, update_sr=True, goal=goal)
+            M, V, earned_rewards = actor_critic(analytical_sr, 300, 0.05, 0.99, 400, v_init=v_init, update_sr=False, goal=goal)
             sr_earned_rewards[i] = earned_rewards
         one_hot_earned_rewards_map[(label, args)] = one_hot_earned_rewards
         sr_earned_rewards_map[(label, args)] = sr_earned_rewards 
@@ -836,22 +801,18 @@ for label, init_func in initialization_types.items():
 
 plt.figure(figsize=(15, 15))
 filter_size = 7
-plt.plot(gaussian_filter(one_hot_earned_rewards_map[("gaussian", (10,))].mean(axis=0), filter_size), label="Gaussian std=5")
-plt.plot(gaussian_filter(one_hot_earned_rewards_map[("gaussian", (5,))].mean(axis=0), filter_size), label="Gaussian std=5")
-plt.plot(gaussian_filter(one_hot_earned_rewards_map[("gaussian", (1,))].mean(axis=0), filter_size), label="Gaussian std=1")
 
-plt.plot(gaussian_filter(sr_earned_rewards_map[("gaussian", (10,))].mean(axis=0), filter_size), label="Gaussian std=10 SR", linestyle='--')
-plt.plot(gaussian_filter(sr_earned_rewards_map[("gaussian", (5,))].mean(axis=0), filter_size), label="Gaussian std=5 SR", linestyle='--')
-plt.plot(gaussian_filter(sr_earned_rewards_map[("gaussian", (1,))].mean(axis=0), filter_size), label="Gaussian std=1 SR",linestyle='--')
+for args in initialization_type_args["gaussian"]:
+    plt.plot(gaussian_filter(one_hot_earned_rewards_map[("gaussian", args)].mean(axis=0), filter_size), label=legend_templates["gaussian"].format(*args))
+    plt.plot(gaussian_filter(sr_earned_rewards_map[("gaussian", args)].mean(axis=0), filter_size), label="SR " + legend_templates["gaussian"].format(*args), linestyle='--')
 
-plt.plot(gaussian_filter(one_hot_earned_rewards_map[("zeros", (0,))].mean(axis=0), filter_size), label="zeros 1-hot")
-plt.plot(gaussian_filter(sr_earned_rewards_map[("zeros", (0,))].mean(axis=0), filter_size), label="zeros SR", linestyle='--')
+for args in initialization_type_args["constant"]:
+    plt.plot(gaussian_filter(one_hot_earned_rewards_map[("constant", args)].mean(axis=0), filter_size), label=legend_templates["constant"].format(*args))
+    plt.plot(gaussian_filter(sr_earned_rewards_map[("constant", args)].mean(axis=0), filter_size), label=legend_templates["constant"].format(*args), linestyle='--')
 
-plt.plot(gaussian_filter(one_hot_earned_rewards_map[("ones", (1,))].mean(axis=0), filter_size), label="ones 1-hot")
-plt.plot(gaussian_filter(sr_earned_rewards_map[("ones", (1,))].mean(axis=0), filter_size), label="ones SR", linestyle='--')
-
+plt.title("Value Initialization")
 plt.legend()
-plt.savefig("value_initialization.png")
+plt.savefig(f"{IMAGE_PATH}/part-5-value_initialization.png")
 ## %%
 
 # %%
