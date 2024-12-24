@@ -816,7 +816,7 @@ for args in [(0,), (1,),  (10,), (50,), (90,)]: #initialization_type_args["const
 
 plt.title("Constant Value Initialization")
 plt.legend()
-plt.savefig(f"{IMAGE_PATH}/constant-part-5-value_initialization.png")
+plt.savefig(f"{IMAGE_PATH}/part-5-constant-value_initialization.png")
 plt.show()
 ## %%
 # %%
