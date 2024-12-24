@@ -762,10 +762,9 @@ plot_maze(maze)
 plt.imshow(gaussian_value_initialization(maze, goal, goal_value, 5).reshape(maze.shape), cmap='hot') 
  
 #%%
-# TODO
 initialization_types = {
     "gaussian": lambda std: gaussian_value_initialization(maze, goal, goal_value, std),
-    "constant": lambda args: np.ones(maze.size)*args[0],
+    "constant": lambda c: np.ones(maze.size)*c,
 }
 
 initialization_type_args = {
@@ -773,10 +772,6 @@ initialization_type_args = {
     "constant": [(0,), (1,), (5,), (10,), (20,), (50,), (90,)],
 }
 
-legend_templates = {
-    "gaussian": "Gaussian std={}",
-    "constant": "Constant",
-}
 
 one_hot_earned_rewards_map = {}
 sr_earned_rewards_map = {}
@@ -798,21 +793,30 @@ for label, init_func in initialization_types.items():
         sr_earned_rewards_map[(label, args)] = sr_earned_rewards 
 # plot the resulting learning curves
 # %%
+legend_templates = {
+    "gaussian": "Gaussian std={}",
+    "constant": "Constant c={}",
+}
 
-plt.figure(figsize=(15, 15))
+plt.figure(figsize=(10, 5))
 filter_size = 7
 
 for args in initialization_type_args["gaussian"]:
-    plt.plot(gaussian_filter(one_hot_earned_rewards_map[("gaussian", args)].mean(axis=0), filter_size), label=legend_templates["gaussian"].format(*args))
+    plt.plot(gaussian_filter(one_hot_earned_rewards_map[("gaussian", args)].mean(axis=0), filter_size), label="1-Hot "+legend_templates["gaussian"].format(*args))
     plt.plot(gaussian_filter(sr_earned_rewards_map[("gaussian", args)].mean(axis=0), filter_size), label="SR " + legend_templates["gaussian"].format(*args), linestyle='--')
-
-for args in initialization_type_args["constant"]:
-    plt.plot(gaussian_filter(one_hot_earned_rewards_map[("constant", args)].mean(axis=0), filter_size), label=legend_templates["constant"].format(*args))
-    plt.plot(gaussian_filter(sr_earned_rewards_map[("constant", args)].mean(axis=0), filter_size), label=legend_templates["constant"].format(*args), linestyle='--')
-
-plt.title("Value Initialization")
+plt.title("Gaussian Value Initialization")
 plt.legend()
-plt.savefig(f"{IMAGE_PATH}/part-5-value_initialization.png")
-## %%
+plt.savefig(f"{IMAGE_PATH}/part-5-gaussian-value_initialization.png")
+plt.show()
 
+plt.figure(figsize=(10, 5))
+for args in [(0,), (1,),  (10,), (50,), (90,)]: #initialization_type_args["constant"]:
+    plt.plot(gaussian_filter(one_hot_earned_rewards_map[("constant", args)].mean(axis=0), filter_size), label="1-Hot "+legend_templates["constant"].format(*args))
+    plt.plot(gaussian_filter(sr_earned_rewards_map[("constant", args)].mean(axis=0), filter_size), label="SR "+legend_templates["constant"].format(*args), linestyle='--')
+
+plt.title("Constant Value Initialization")
+plt.legend()
+plt.savefig(f"{IMAGE_PATH}/constant-part-5-value_initialization.png")
+plt.show()
+## %%
 # %%
