@@ -172,6 +172,42 @@ def init_propensities(maze, epsilon = 1e-5):
             for _, action in reachable_moves: 
                 M[position_idx(i, j, maze), action] = epsilon
     return M
+
+#%%
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
+
+def plot_v_weights(V_weight_history, episode_idx):
+    # Plot the history of V_weights over time and states
+    #
+    # Assuming V_weight_history is a 2D array (episodes x states)
+    fig = plt.figure(figsize=(15,15))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Define the axes
+    time = np.arange(V_weight_history.shape[0])  # Episode indices
+    states = np.arange(V_weight_history.shape[1])  # State indices
+    time, states = np.meshgrid(time, states)  # Create meshgrid for 3D plotting
+
+    # Plot the surface of V_weights over time and states
+    # print(f"V_weight_history.shape: {V_weight_history.T.shape}")
+    print(f"time.T.shape: {time.T.shape}")
+    print(f"states.shape: {states.T.shape}")
+    print(f"V_weight_history.shape: {V_weight_history.shape}") 
+
+    ax.set_title(f"Episode {episode_idx} - V-Weights History")
+    ax.set_xlabel("Episodes")
+    ax.set_ylabel("States")
+    ax.set_zlabel("V-Weights")
+
+    ax.plot_surface(time.T, states.T, V_weight_history, 
+                    cmap='viridis')
+
+    
+    # Save the figure
+    plt.savefig(f"{IMAGE_PATH}/v-weights-history-episode-{episode_idx}.png")
+    plt.close(fig)  # Close the figure to free up memory
 #%%
 """
 Learning to act
@@ -192,16 +228,18 @@ We will program an actor-critic to learn a policy on the maze world.
 - Reward Position (1,1)
 """
 #%%
-def actor_critic(state_representation, n_steps, 
-                 alpha, 
-                 gamma, 
-                 n_episodes, 
-                 update_sr=False, 
-                 start_func=normal_start, 
-                 v_init=None,
-                 goal_reach_reward=goal_value, 
-                 step_penalty=0,
-                 goal=goal):
+def actor_critic(state_representation, 
+                    n_steps, 
+                    alpha, 
+                    gamma, 
+                    n_episodes, 
+                    update_sr=False, 
+                    start_func=normal_start, 
+                    v_init=None,
+                    goal_reach_reward=goal_value, 
+                    step_penalty=0,
+                    goal=goal, 
+                    debug=True):
     # Implement the actor-critic algorithm to learn to navigate the maze
     #
     # state_representation - 
@@ -227,7 +265,7 @@ def actor_critic(state_representation, n_steps,
                      "num_episodes": 0, 
                      "num_steps": 0, 
                      "num_goal_reached": 0
-    }
+                    }
     M = init_propensities(maze)
     # Initialize state-value function
     num_states = state_representation.shape[0]
@@ -238,7 +276,8 @@ def actor_critic(state_representation, n_steps,
     LEGAL_MOVES = legal_moves()
 
     episode_counters = [] 
-    
+   
+    V_weight_history = np.zeros((n_episodes, num_states))
     # Iterate over episodes
     for episode_idx in range(n_episodes):
         # Initializations
@@ -250,8 +289,10 @@ def actor_critic(state_representation, n_steps,
         perf_counters["num_episodes"] += 1
         state_idx = start_func()
         
+        if debug: 
+            print(f"Episode: {episode_idx}  Starting: {position_from_idx(state_idx, maze)}") 
         
-        # cumulative discount factor
+        # Cumulative discount factor
         I = 1
         # episode trajectory
         trajectory = []
@@ -277,40 +318,14 @@ def actor_critic(state_representation, n_steps,
                 # Compute Action probabilities - How to only consider valid actions
                 valid_actions = [action for action, move in enumerate(LEGAL_MOVES) 
                                  if check_legal(maze, tuple(np.array(position_from_idx(state_idx, maze)) + np.array(move)))]
-
-                # action_probabilities = softmax(M[state_idx, valid_actions]) 
-                # for i,_ in enumerate(LEGAL_MOVES):
-                #    if i not in set(valid_actions):
-                #        action_probabilities = np.insert(action_probabilities, i, 0) 
-                # print("action_probabilities", action_probabilities, "shape", action_probabilities.shape, "valid_actions", valid_actions)
-                # chosen_action = np.random.choice(valid_actions, p=valid_probabilities)
-                
-                action_probabilities = softmax(M[state_idx, :])
-                valid_probabilities = action_probabilities[valid_actions]
-                if valid_probabilities.sum() == 0:
-                        print(f"Warning: Sum of probabilities is zero for state {state_idx} - {position_from_idx(state_idx, maze)}")
-                        valid_probabilities = np.ones_like(valid_probabilities) / len(valid_probabilities)
-                else:
-                        valid_probabilities /= valid_probabilities.sum()
-                # Ensure that the probabilities of invalid actions are zero 
-                for i in range(len(action_probabilities)):
-                    if i not in set(valid_actions):
-                        action_probabilities[i] = 1e-9  # small value
-                try:
-                    chosen_action = np.random.choice(valid_actions, p=valid_probabilities)
-                except ValueError:
-                    print("valid_actions:", valid_actions)
-                    print("valid_probabilities:", valid_probabilities)
-                    print("action_probabilities:", action_probabilities)
-                    print("M[state_idx, :]:", M[state_idx, :])
-                    print("state representation:", state_representation[state_idx])
-                    print("v_weights:", V_weights)
-                    plt.imshow(state_representation, cmap='hot')
-                    raise ValueError("ValueError")
-                # Choose action according to action probabilities
-                #action_probabilities = np.nan_to_num(action_probabilities, nan=-np.inf, copy=False)
-                #chosen_action = np.random.choice(4, p=action_probabilities)
-                # take action
+                valid_propensities = np.array([M[state_idx, action] if action in valid_actions else -np.inf 
+                                               for action, _ in enumerate(LEGAL_MOVES)])
+                action_probabilities = softmax(valid_propensities) 
+                if np.isnan(action_probabilities).any():
+                    action_probabilities = np.array([1/len(valid_actions) if action in valid_actions else 0])
+                    chosen_action = np.random.choice(valid_actions)
+                else: 
+                    chosen_action = np.random.choice(len(action_probabilities), p=action_probabilities)
                 move = LEGAL_MOVES[chosen_action]
                 new_state = tuple(np.array(position_from_idx(state_idx, maze)) + np.array(move))
                 i, j = new_state
@@ -318,6 +333,8 @@ def actor_critic(state_representation, n_steps,
                 is_legal_move = check_legal(maze, new_state)
                 if not is_legal_move:
                     per_episode_counters["rejections"] = per_episode_counters.get("rejections", 0) + 1
+                    if debug: 
+                        print(f"Rejected move: ({i}, {j})")
                 else:
                     per_episode_counters["actions"] = per_episode_counters.get("actions", 0) + 1
                     
@@ -335,6 +352,7 @@ def actor_critic(state_representation, n_steps,
             
             per_episode_counters["state_visit_counts"][state_idx] += 1 
             trajectory.append(new_state_idx)
+            
             V_state = V_weights @ state_representation[state_idx]
             goal_reached = new_state == goal   
             # Compute the value of the new state, goal-state has value 0 
@@ -348,6 +366,8 @@ def actor_critic(state_representation, n_steps,
             delta = reward + V_diff
             # linear function \nabla_{V_weights} X(s)* V_weights  = X(s)
             V_weights += alpha * delta * state_representation[state_idx] 
+            # Save history
+            V_weight_history[episode_idx, :] = V_weights
             # Assuming same \alpha^\theta == \alpha^\theat) :( ?
             # Reduce the probability of the not-chosen action 
             M[state_idx, :] += alpha * I * delta * (-action_probabilities) 
@@ -363,9 +383,36 @@ def actor_critic(state_representation, n_steps,
         # Episode ended due to max steps 
         if step_idx == n_steps - 1 and not goal_reached: 
             episode_rewards[episode_idx] = 0
-        if update_sr and len(trajectory) > 0: # Update the state representation
-            #print(f"Updating SR - Episode {episode_idx}- Trajectory: {[position_from_idx(idx, maze) for idx in trajectory]}") 
-            state_representation[:] = update_sr_after_episode(state_representation, trajectory, gamma, alpha)
+
+        # Update the state representation 
+        if update_sr and len(trajectory) > 0: 
+            # print(f"Updating SR - Episode {episode_idx}- Trajectory: {[position_from_idx(idx, maze) for idx in trajectory]}") 
+            old_state_representation = np.copy(state_representation)
+            state_representation = np.copy(update_sr_after_episode(state_representation, trajectory, gamma, alpha))
+            # al sr values are between 0 and 1
+            assert (state_representation >= 0).all(), "state representation should be positive" 
+
+            if episode_idx % 100 == 0:
+                plt.title(f"Episode {episode_idx} - Updating SR")
+                plt.imshow(state_representation, cmap='hot') 
+                plt.savefig(f"{IMAGE_PATH}/sr-update-episode-{episode_idx}.png")
+                
+                # v_weights on maze.
+                plt.title(f"Episode {episode_idx} - V-Weights")
+                plot_maze(maze)
+                plt.imshow((V_weights).reshape(maze.shape), cmap='hot')
+                plt.savefig(f"{IMAGE_PATH}/v-weights-episode-{episode_idx}.png") 
+                # Propensities 
+                plt.title(f"Episode {episode_idx} - Propensities")
+                for action in range(4):
+                    plt.imshow(M[:, action].reshape(maze.shape), cmap='hot', vmin=0, vmax=1)
+                    plt.savefig(f"{IMAGE_PATH}/propensities-episode-{episode_idx}-action-{action}.png")
+                # 3D plot of v-weights with time axis and state axis 
+                print(f"Episode {episode_idx} - Plotting V-Weights")
+                plot_v_weights(V_weight_history, episode_idx)
+               
+                   
+                
                  
     # Reward only for reaching the goal, thus episode reward is 
     # same as Discounted last step reward.
@@ -379,13 +426,17 @@ def update_sr_after_episode(state_representation, trajectory,
     old_state_representation = np.copy(state_representation)
     trajectory = np.array(trajectory)
     for idx, state_idx in enumerate(trajectory):
-        if debug: print(f"state_idx: {state_idx}") 
+        if debug: 
+            print(f"state_idx: {state_idx}") 
         current_trajectory = trajectory[idx:]
-        if debug: print(f"current_trajectory: {current_trajectory}")
+        if debug: 
+            print(f"current_trajectory: {current_trajectory}")
         old_state_representation_state_idx = np.copy(state_representation[state_idx, :])
         state_representation[state_idx, :] = \
             learn_from_traj(state_representation[state_idx, :], 
-                            current_trajectory, gamma, alpha, debug=debug)
+                            current_trajectory, gamma, alpha, 
+                            debug=debug)
+
         change = np.sum(np.abs(old_state_representation_state_idx - state_representation[state_idx, :]))
         #if debug: print(f"STATE-CHANGE:{position_from_idx(state_idx, maze)}: {change}")
        
@@ -405,6 +456,7 @@ def update_sr_after_episode(state_representation, trajectory,
         plt.imshow(state_representation - old_state_representation, cmap='hot')
         plt.colorbar()
         plt.show()
+
     if debug:
         for i in range(state_representation.shape[0]):
             for j in range(state_representation.shape[1]):
@@ -415,7 +467,8 @@ def update_sr_after_episode(state_representation, trajectory,
                 
     #assert not np.allclose(old_state_representation, state_representation)
     total_change = np.sum(np.abs(old_state_representation - state_representation))
-    if debug: print(f"total-change: {total_change}")
+    if debug: 
+        print(f"total-change: {total_change}")
     return state_representation
     
 #%%
@@ -479,8 +532,12 @@ def test_update_sr_after_episode():
     expected_sr_2 = alpha*np.array([0, 0, 1, 0, 0, 0, 0, 0, 0]) 
     
     # Call the function
-    updated_sr = update_sr_after_episode(state_representation, trajectory, gamma, alpha, debug=True)
-    
+    updated_sr = update_sr_after_episode(state_representation, 
+                                                        trajectory, 
+                                                        gamma, 
+                                                        alpha, 
+                                                        debug=True)
+        
     # Check if the updated SR matches the expected SR for state 0
     actual_sr_0 = updated_sr[0, :]
     print("Expected SR for state 0:", expected_sr_0)
@@ -556,37 +613,36 @@ plt.savefig(f"{IMAGE_PATH}/earned_rewards-part-2.png")
 plt.show()
 
 #%%
+   
+#%%
+# Part 3
+np.random.seed(42)
 @numba.jit
 def pick_random_element(arr):
     idx = np.random.randint(0, len(arr))
     return arr[idx]
-    
-#%%
-# Part 3
+
 def random_start(maze):
     free_states = np.array([position_idx(i, j, maze) 
                         for i in range(maze.shape[0]) 
                             for j in range(maze.shape[1]) 
                                 if check_legal(maze, (i, j))])
     return lambda: pick_random_element(free_states)
-#%%
-plt.hist([random_start(maze)() for i in range(1000)],  bins=np.arange(maze.size + 1) - 0.5)
 
-#%%
+plt.hist([random_start(maze)() for i in range(1000)],  bins=np.arange(maze.size + 1) - 0.5)
+plt.show()
+
 start_func = random_start(maze)
 learning_sr = random_walk_sr(transitions, 0.8).T
 n_steps = 300 # 300 steps per episode
 n_episodes = 1000 # 1000 episodes
 alpha = 0.05
 gamma = 0.99
-np.random.seed(42)
-M, V, earned_rewards = actor_critic(learning_sr, 
-                                        n_steps, 
-                                        alpha, 
-                                        gamma, 
-                                        n_episodes,
+
+M, V, earned_rewards = actor_critic(learning_sr, n_steps, 
+                                        alpha, gamma, n_episodes,
                                         update_sr=True, 
-                                        start_func=start_func)
+                                        start_func=start_func, debug=True)
 part_3_random_start_sr = earned_rewards
 
 #%%
