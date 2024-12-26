@@ -363,8 +363,8 @@ def actor_critic(state_representation,
     for episode_idx in range(n_episodes):
         # Initializations
         # Move to the start state/possibly random start state
+        per_episode_counters = {} 
         if enable_performance_counters:
-            per_episode_counters = {} 
             per_episode_counters["state_visit_counts"] = np.zeros(num_states)
             episode_counters.append(per_episode_counters)
             perf_counters["num_episodes"] += 1
@@ -391,7 +391,7 @@ def actor_critic(state_representation,
             is_legal_move = False
             move= None
             new_state = None
-            max_checks = 1000 
+            max_checks = 100 
             checks = 0
             action_probabilities = None
             valid_probabilities = None
@@ -844,7 +844,57 @@ for state_idx in range(maze.size):
         plt.show()
 
 #%% Plot the SR 
+#%% Part-4 Parallel
+
+import numpy as np
+from joblib import Parallel, delayed
+
+# Define the function to be parallelized
+def run_experiment(i, transitions, maze_shape, num_steps, num_episodes, original_goal, new_goal):
+    print("Running experiment", i)
+    # Run with random-walk SR
+    analytical_sr = random_walk_sr(transitions, 0.8).T
+    M, V, earned_rewards_clamped = actor_critic(
+        analytical_sr, num_steps, 0.05, 0.99, num_episodes, goal=new_goal
+    )
+    
+    # Run with updated SR
+    re_learning_sr = random_walk_sr(transitions, 0.8).T
+    # Train to original goal
+    _, _, _ = actor_critic(
+        re_learning_sr, num_steps, 0.05, 0.99, num_episodes, update_sr=True, goal=original_goal
+    )
+    # Learn new goal
+    M, V, earned_rewards_relearned = actor_critic(
+        re_learning_sr, num_steps, 0.05, 0.99, num_episodes, update_sr=True, goal=new_goal
+    )
+    
+    return earned_rewards_clamped, earned_rewards_relearned
+
+
+# Parameters
+goal = (5, 5)
+original_goal = (1, 1)
+new_goal = (5, 5)
+goal_state = goal[0] * maze.shape[1] + goal[1]
+num_episodes = 1000
+num_steps = 400
+earned_rewards_clamped_list = np.zeros((20, 400, 1000))
+earned_rewards_relearned_list = np.zeros((20, 400, 1000))
+
+# Parallel execution using Joblib
+results = Parallel(n_jobs=-1)(delayed(run_experiment)(
+    i, transitions, maze.shape, num_steps, num_episodes, original_goal, new_goal
+) for i in range(20))
+
+# Collect results
+for i, (earned_rewards_clamped, earned_rewards_relearned) in enumerate(results):
+    earned_rewards_clamped_list[i] = earned_rewards_clamped
+    earned_rewards_relearned_list[i] = earned_rewards_relearned
+
+
 #%% Part 4
+
 """
 How does a re-learned SR affect future policy changes? 
 
@@ -899,6 +949,7 @@ for i in range(20):
 
 #%% Save results with pickle
 ## Use timestamp and save pickl file for part-4
+import datetime
 with open(f"{IMAGE_PATH}/part-4-results-{datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.bin", "wb") as f:
     pickle.dump((earned_rewards_clamped_list, earned_rewards_relearned_list), f)
 
@@ -907,11 +958,11 @@ with open(f"{IMAGE_PATH}/part-4-results-{datetime.datetime.now().strftime('%Y-%m
 # 20 - number of trials, 1000 number of episodes, 400 - number of steps
 # Plot the performance averages of the two types of learners
 avg_clamped = earned_rewards_clamped_list.mean(axis=1).mean(axis=0)
-#avg_relearned = earned_rewards_relearned_list.mean(axis=1).mean(axis=0)
+avg_relearned = earned_rewards_relearned_list.mean(axis=1).mean(axis=0)
 
 plt.figure(figsize=(10, 5))
 plt.plot(avg_clamped, label='clamped')
-#plt.plot(avg_relearned, label='relearned')
+plt.plot(avg_relearned, label='relearned')
 plt.legend()
 plt.savefig(f"{IMAGE_PATH}/earned_rewards-part-4.png")
 plt.show()
