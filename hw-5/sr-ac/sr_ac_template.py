@@ -1,6 +1,9 @@
 #%%
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
 import pickle
-import datetime
+from datetime import datetime
 import os
 import numba
 import numpy as np
@@ -9,6 +12,18 @@ import seaborn as sns
 import pandas as pd
 from scipy.ndimage import gaussian_filter
 
+import importlib
+import maze_utils
+importlib.reload(maze_utils)
+
+from maze_utils import (
+                        make_maze, 
+                        plot_trajectory, 
+                        update_sr_after_episode, 
+                        plot_maze, 
+                        plot_stepwise_v_weights_history, 
+                        plot_v_weights, 
+                        plot_sr_history)
 sns.set_theme()
 #%%
 # Get the absolute path of the current file
@@ -176,99 +191,6 @@ def init_propensities(maze, epsilon = 1e-6):
     return M
 
 #%%
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import numpy as np
-
-def plot_sr_history(SR_history, episode_idx, state_idx):
-    """
-    Plot the history of SR over time and states
-    """
-    print("Plotting SR history")
-    fig = plt.figure(figsize=(15,15))
-    ax = fig.add_subplot(111, projection='3d')
-
-   
-    # Define the axes
-    time = np.arange(SR_history.shape[0])  # Episode indices
-    states = np.arange(SR_history[episode_idx, state_idx, :].shape[0])  # State indices
-    time, states = np.meshgrid(time, states)  # Create meshgrid for 3D plotting
-    print(f"time.T.shape: {time.T.shape}")
-    print(f"states.shape: {states.T.shape}")
-    print(f"SR_history[episode_idx, state_idx, :].shape: {SR_history[episode_idx, state_idx, :].shape}")
-    print(f"SR_history.shape: {SR_history.shape}")
-    print(f"SR_history[episode_idx, state_idx, :].shape: {SR_history[episode_idx, state_idx, :].shape}")
-    print(f"SR_history[episode_idx, state_idx, :].shape: {SR_history[episode_idx, state_idx, :].shape}")
-     
-    # Plot the surface of SR over time and states
-    ax.set_title(f"Episode {episode_idx} State: {state_idx} {position_from_idx(state_idx, maze)}- SR History")
-    ax.set_xlabel("Episodes")
-    ax.set_ylabel("States")
-    ax.set_zlabel("SR")
-    
-    print(f"time.T.shape: {time.T.shape}")
-    print(f"states.shape: {states.T.shape}")
-    print(f"SR_history.shape: {SR_history.shape}")
-    
-    ax.plot_surface(time.T, states.T, SR_history[:, state_idx, :], cmap='viridis')
-    
-    # Save the figure
-    plt.savefig(f"{IMAGE_PATH}/sr-history-episode-{episode_idx}-state-{state_idx}-{position_from_idx(state_idx, maze)}.png")
-    plt.close(fig)  # Close the figure to free up memory
-
-#%%
-def plot_stepwise_v_weights_history(V_weight_history, episode_idx,step_idx):
-    fig = plt.figure(figsize=(15,15))
-    ax = fig.add_subplot(111, projection='3d')
-    time = np.arange(V_weight_history[episode_idx].shape[0])  # steps indices
-    states = np.arange(V_weight_history[episode_idx].shape[1])  # State indices
-    time, states = np.meshgrid(time, states)  # Create meshgrid for 3D plotting    
-  
-    print(f"time.T.shape: {time.T.shape}")
-    print(f"states.shape: {states.T.shape}")
-    print(f"V_weight_history.shape: {V_weight_history[episode_idx].shape}")
-    ax.set_title(f"Episode {episode_idx} - V-Weights History - {goal} - Step {step_idx}")
-    ax.set_xlabel("Steps")
-    ax.set_ylabel("States")
-    ax.set_zlabel("V-Weights")
-    
-    ax.plot_surface(time.T, states.T, V_weight_history[episode_idx], cmap='viridis')
-    plt.savefig(f"{IMAGE_PATH}/v-weights-per-step-history-episode-{episode_idx}-{step_idx}.png") 
-    plt.close(fig)  # Close the figure to free up memory
-    
-    
-#%%    
-def plot_v_weights(V_weight_history, episode_idx):
-    # Plot the history of V_weights over time and states
-    #
-    # Assuming V_weight_history is a 2D array (episodes x states)
-    fig = plt.figure(figsize=(15,15))
-    ax = fig.add_subplot(111, projection='3d')
-
-    # Define the axes
-    time = np.arange(V_weight_history.shape[0])  # Episode indices
-    states = np.arange(V_weight_history.shape[1])  # State indices
-    time, states = np.meshgrid(time, states)  # Create meshgrid for 3D plotting
-
-    # Plot the surface of V_weights over time and states
-    # print(f"V_weight_history.shape: {V_weight_history.T.shape}")
-    print(f"time.T.shape: {time.T.shape}")
-    print(f"states.shape: {states.T.shape}")
-    print(f"V_weight_history.shape: {V_weight_history.shape}") 
-
-    ax.set_title(f"Episode {episode_idx} - V-Weights History")
-    ax.set_xlabel("Episodes")
-    ax.set_ylabel("States")
-    ax.set_zlabel("V-Weights")
-
-    ax.plot_surface(time.T, states.T, V_weight_history, 
-                    cmap='viridis')
-
-    
-    # Save the figure
-    plt.savefig(f"{IMAGE_PATH}/v-weights-history-episode-{episode_idx}.png")
-    plt.close(fig)  # Close the figure to free up memory
-#%%
 """
 Learning to act
 
@@ -292,14 +214,15 @@ def actor_critic(state_representation,
                     n_steps, 
                     alpha, 
                     gamma, 
-                    n_episodes, 
+                    n_episodes,
+                    sr_regularization=0.01, 
                     update_sr=False, 
                     start_func=normal_start, 
                     v_init=None,
                     goal_reach_reward=goal_value, 
                     step_penalty=0,
                     goal=goal, 
-                    clip_weight_max_value=1e2,
+                    clip_weight_max_value=1e5,
                     enable_performance_counters=False,
                     debug=False):
     # Implement the actor-critic algorithm to learn to navigate the maze
@@ -329,7 +252,13 @@ def actor_critic(state_representation,
                      "num_steps": 0, 
                      "num_goal_reached": 0,
                      'num_clipped_weights': 0, 
+                     'SR_history': None,
+                     'M_history': None,
+                     'M_history_step_wise': None, 
+                     'V_weight_history': None,
+                     'V_weight_history_step_wise': None,
                      "locals" : {
+                         'sr_regularization': sr_regularization,
                          "n_steps": n_steps, 
                          "alpha": alpha, 
                          "gamma": gamma, 
@@ -358,6 +287,8 @@ def actor_critic(state_representation,
     V_weight_history = np.zeros((n_episodes, num_states))
     V_weight_history_step_wise = np.zeros((n_episodes, n_steps, num_states))
     SR_history = np.zeros((n_episodes, num_states, num_states))
+    M_history = np.zeros((n_episodes, num_states, 4))
+    M_history_step_wise = np.zeros((n_episodes, n_steps, num_states, 4))
 
     # Iterate over episodes
     for episode_idx in range(n_episodes):
@@ -474,7 +405,8 @@ def actor_critic(state_representation,
             # Reduce the probability of the not-chosen action 
             M[state_idx, :] += alpha * I * delta * (-action_probabilities) 
             M[state_idx, chosen_action] += alpha * I * delta * (1) # so we have net (1 - action_probabilities[chosen_action]) increase in probability
-            
+            M_history_step_wise[episode_idx, step_idx, :, :] = M
+           
             # Absorbing state  
             if (i, j) == goal: 
                 episode_rewards[episode_idx] = I * reward # earned rewards for this episode
@@ -486,21 +418,23 @@ def actor_critic(state_representation,
         # Episode ended due to max steps 
         if step_idx == n_steps - 1 and not goal_reached:
             episode_rewards[episode_idx] = 0
-            if enable_performance_counters:
-                per_episode_counters["trajectory"] = np.copy(np.array(trajectory))
 
+        if enable_performance_counters:
+            per_episode_counters["trajectory"] = np.copy(np.array(trajectory))
+            # Save the M history
+            M_history[episode_idx, :, :] = M
+            # Save step wise M history
+            
         # Update the state representation 
         if update_sr and len(trajectory) > 0: 
             # print(f"Updating SR - Episode {episode_idx}- Trajectory: {[position_from_idx(idx, maze) for idx in trajectory]}") 
-            old_state_representation = np.copy(state_representation)
-            state_representation = np.copy(update_sr_after_episode(state_representation, trajectory, gamma, alpha))
+            state_representation = np.copy(update_sr_after_episode(state_representation, trajectory, gamma, alpha, regularization=sr_regularization))
             # Save the state representation history
             SR_history[episode_idx, :, :] = np.copy(state_representation)
             # al sr values are between 0 and 1
             assert (state_representation >= 0).all(), "state representation should be positive" 
             assert (state_representation <= 1/(1-gamma)).all(), "state representation should be less than 1"
 
-            episode_counters
             if debug and episode_idx % 50 == 0:
                 # step wise SR
                 plt.figure()
@@ -549,163 +483,30 @@ def actor_critic(state_representation,
                 plt.savefig(f"{IMAGE_PATH}/v-weights-rewards-episode-{episode_idx}.png")
                 plt.show()
                 
-                   
     # Reward only for reaching the goal, thus episode reward is 
     # same as Discounted last step reward.
     if enable_performance_counters:
         perf_counters["episode_counters"] = episode_counters
+         
     if debug and enable_performance_counters: 
         print(perf_counters)
+        
     # create pickle file name with current timestamp 
-    from datetime import datetime
-    import pickle
-   
+    if enable_performance_counters:
+        perf_counters["V_weight_history_step_wise"] = V_weight_history_step_wise
+        perf_counters["V_weight_history"] = V_weight_history
+        perf_counters["SR_history"] = SR_history
+        perf_counters["M_history"] = M_history
+        perf_counters["M_history_step_wise"] = M_history_step_wise
+        
     if enable_performance_counters: 
         pickle_file_name = f"{IMAGE_PATH}/perf_counters-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.bin"
+        print("Saving performance counters to: ", pickle_file_name)
         with open(pickle_file_name, "wb") as f:
             # use pickle to save perf_counters
             pickle.dump(perf_counters, f)
     return M, V_weights, episode_rewards
-
-#%%
-def update_sr_after_episode(state_representation, trajectory, 
-                            gamma=0.98, alpha=0.05, debug=False):
-    old_state_representation = np.copy(state_representation)
-    trajectory = np.array(trajectory)
-    
-    for idx, state_idx in enumerate(trajectory):
-        if debug: 
-            print(f"state_idx: {state_idx}") 
-        current_trajectory = trajectory[idx:]
-        if debug: 
-            print(f"current_trajectory: {current_trajectory}")
-        old_state_representation_state_idx = np.copy(state_representation[state_idx, :])
-        # Update the state representation for the state at which the trajectory starts
-        state_representation[state_idx, :] = \
-            learn_from_traj(state_representation[state_idx, :], 
-                            current_trajectory, gamma, alpha, 
-                            debug=debug)
-        # Normalize the state representation
-        #state_representation[state_idx, :] /= state_representation[state_idx, :].sum()
-
-
-        change = np.sum(np.abs(old_state_representation_state_idx - state_representation[state_idx, :]))
-        #if debug: print(f"STATE-CHANGE:{position_from_idx(state_idx, maze)}: {change}")
-       
-    if debug: 
-        # figure with row of three images
-        plt.figure(figsize=(15, 30))
-        ax = plt.subplot(1, 3, 1)
-        ax.set_title("Old State Representation")
-        plt.imshow(old_state_representation, cmap='hot')
-        plt.colorbar()
-        ax = plt.subplot(1, 3, 2)
-        ax.set_title("New State Representation")
-        plt.imshow(state_representation, cmap='hot')
-        plt.colorbar()
-        ax = plt.subplot(1, 3, 3)
-        ax.set_title(f"Change: Trajectory: {trajectory}")
-        plt.imshow(state_representation - old_state_representation, cmap='hot')
-        plt.colorbar()
-        plt.show()
-
-    if debug:
-        for i in range(state_representation.shape[0]):
-            for j in range(state_representation.shape[1]):
-                if np.abs(state_representation[i, j] - old_state_representation[i, j]) > 0:
-                    if debug: print(f"state: {i, j}, old: {old_state_representation[i, j]}, new: {state_representation[i, j]}")
-                    if debug: print(f"difference: {state_representation[i, j] - old_state_representation[i, j]}")
-                #if debug: print(f"Altered transition from {position_from_idx(i, maze)} to {position_from_idx(j, maze)}")
-                
-    #assert not np.allclose(old_state_representation, state_representation)
-    total_change = np.sum(np.abs(old_state_representation - state_representation))
-    if debug: 
-        print(f"total-change: {total_change}")
-    return state_representation
-    
-#%%
-# One part to the solution of exercise part 3, if you want to update the 
-# SR after each episode
-def learn_from_traj(succ_repr, trajectory, gamma=0.98, alpha=0.05, debug=False):
-    # Write a function to update a given successor representation 
-    # (for the state at which the trajectory starts) using an 
-    # example trajectory using:
-    #       discount factor gamma 
-    #       learning rate alpha
-    observed = np.zeros_like(succ_repr)
-    #if debug: print(f"learn_from_traj: {trajectory}") 
-    for i, state in enumerate(trajectory):
-        #if debug: print(f"learn_from_traj: state: {state}")
-        observed[state] += gamma ** i
-    assert (observed >= 0).all(), "observed should be positive"
-    #assert (succ_repr >= 0).all(), "succ_repr should be positive"
-    delta =  observed - succ_repr
-    #if debug: print(f"delta: {delta}")
-    #if debug: print(f"successor: {succ_repr}, observed: {observed}, total-delta:{np.sum(np.square(delta))}")
-    # if np.sum(np.abs(delta)) >0 : print("non-zero-delta: ", np.sum(np.abs(delta)))
-    succ_repr += alpha * delta 
-    # assert (succ_repr >= 0).all(), "succ_repr should remain positive"
-    # Return the updated successor representation
-    return succ_repr
-
-#%%
-import numpy as np
-
-def test_learn_from_traj_basic():
-    # Basic test with a simple trajectory
-    succ_repr = np.zeros(6)
-    trajectory = [0, 1, 2, 3]
-    gamma = 0.9
-    alpha = 0.1
-    updated_repr = learn_from_traj(np.copy(succ_repr), trajectory, gamma, alpha)
-    print("updated_repr", updated_repr) 
-    # Compute expected values manually
-    expected = np.zeros(6)
-    for i, state in enumerate(trajectory):
-        expected[state] += gamma ** i
-    expected = succ_repr + alpha * (expected - succ_repr)
-    print("expected", expected)    
-    assert np.allclose(updated_repr, expected), "Basic test failed"
-
-test_learn_from_traj_basic()
-#%%
-
-def test_update_sr_after_episode():
-    # Define a simple SR matrix with a 3x3 maze (9 states)
-    state_representation = np.zeros((9, 9))  # Initial SR as zeros
-    trajectory = [0, 1, 2]  # Simple trajectory from state 0 -> 1 -> 2
-    gamma = 0.9  # Discount factor
-    alpha = 0.1  # Learning rate
-    
-    # Expected changes
-    # For state 0, it should observe [1, gamma, gamma^2] along the trajectory
-    expected_sr_0 = alpha*np.array([1, gamma, gamma**2, 0, 0, 0, 0, 0, 0])
-    expected_sr_1 = alpha*np.array([0, 1, gamma, 0, 0, 0, 0, 0, 0]) 
-    expected_sr_2 = alpha*np.array([0, 0, 1, 0, 0, 0, 0, 0, 0]) 
-    
-    # Call the function
-    updated_sr = update_sr_after_episode(state_representation, 
-                                                        trajectory, 
-                                                        gamma, 
-                                                        alpha, 
-                                                        debug=True)
-        
-    # Check if the updated SR matches the expected SR for state 0
-    actual_sr_0 = updated_sr[0, :]
-    print("Expected SR for state 0:", expected_sr_0)
-    print("Actual SR for state 0:  ", actual_sr_0)
-    actual_sr_1  = updated_sr[1, :]
-    actual_sr_2  = updated_sr[2, :]
-    print("Expected SR for state 1:", expected_sr_1)
-    print("Actual SR for state 1:  ", actual_sr_1)
-    assert np.allclose(actual_sr_1, expected_sr_1),  "Test failed: SR update for state 1 does not match expected values"
-    assert np.allclose(actual_sr_0, expected_sr_0), \
-        "Test failed: SR update for state 0 does not match expected values"
-    assert np.allclose(actual_sr_2, expected_sr_2), \
-        "Test failed: SR update for state 0 does not match expected values"
-    print("Test passed!")
-
-test_update_sr_after_episode()
+   
 #%%
 # Part 1
 #%%
@@ -713,7 +514,6 @@ original_goal=(1,1)
 M, V, earned_rewards = actor_critic(np.eye(maze.size), n_steps=300, 
                                         alpha=0.05, gamma=0.99, n_episodes=1000, 
                                         goal=original_goal, start_func=normal_start)
-
 part_1_one_hot_earned_rewards = earned_rewards
 #%%
 # plot state-value function
@@ -733,8 +533,7 @@ plt.legend()
 plt.savefig(f"{IMAGE_PATH}/earned_rewards-part-1.png")
 plt.show()
 
-# Part 2, Now the same for an SR representation
-#%%
+#%% - Part 2, Now the same for an SR representation
 original_goal=(1,1)
 analytical_sr = random_walk_sr(transitions, 0.8).T
 M, V, earned_rewards = actor_critic(analytical_sr, 
@@ -789,11 +588,15 @@ n_episodes = 1000  # explosion  in v_weights
 
 alpha = 0.05 
 gamma = 0.99 
-
+sr_regularization=0.85
 M, V, earned_rewards = actor_critic(learning_sr, n_steps, 
                                         alpha, gamma, n_episodes,
                                         update_sr=True, 
-                                        start_func=start_func, debug=False)
+                                        start_func=start_func, 
+                                        sr_regularization=sr_regularization, 
+                                        debug=False,
+                                        enable_performance_counters=True
+                                        )
 part_3_random_start_sr = earned_rewards
 
 #%%
@@ -845,30 +648,35 @@ for state_idx in range(maze.size):
 
 #%% Plot the SR 
 #%% Part-4 Parallel
-
 import numpy as np
 from joblib import Parallel, delayed
 
 # Define the function to be parallelized
 def run_experiment(i, transitions, maze_shape, num_steps, num_episodes, original_goal, new_goal):
     print("Running experiment", i)
+    sr_regularization = 0.85
     # Run with random-walk SR
     analytical_sr = random_walk_sr(transitions, 0.8).T
     M, V, earned_rewards_clamped = actor_critic(
-        analytical_sr, num_steps, 0.05, 0.99, num_episodes, goal=new_goal
+        analytical_sr, num_steps, 0.05, 0.99, num_episodes, goal=new_goal,
+        sr_regularization=sr_regularization
     )
     
     # Run with updated SR
     re_learning_sr = random_walk_sr(transitions, 0.8).T
     # Train to original goal
     _, _, _ = actor_critic(
-        re_learning_sr, num_steps, 0.05, 0.99, num_episodes, update_sr=True, goal=original_goal
+        re_learning_sr, num_steps, 0.05, 0.99, num_episodes, 
+        update_sr=True, goal=original_goal,
+        sr_regularization=sr_regularization
     )
     # Learn new goal
     M, V, earned_rewards_relearned = actor_critic(
-        re_learning_sr, num_steps, 0.05, 0.99, num_episodes, update_sr=True, goal=new_goal
+        re_learning_sr, num_steps, 0.05, 0.99, num_episodes, 
+        update_sr=False, 
+        goal=new_goal,
+        sr_regularization=sr_regularization
     )
-    
     return earned_rewards_clamped, earned_rewards_relearned
 
 
@@ -893,67 +701,11 @@ for i, (earned_rewards_clamped, earned_rewards_relearned) in enumerate(results):
     earned_rewards_relearned_list[i] = earned_rewards_relearned
 
 
-#%% Part 4
-
-"""
-How does a re-learned SR affect future policy changes? 
-
-We will now move the reward location to (5, 5). 
-
-Perform 1000 episodes of actor-critic (always starting from the 
-original starting position again), with 
-    (a) the original SR from the random walk policy,  
-    (b) the re-learned SR, which is tuned towards finding the reward at 
-        (1, 1). 
-
-Let each learner run from scratch for 20 times 
-and record how much reward was received in each episode. 
-
-To get a smoother estimate of the reward trajectory, 
-Plot the averages over the 20 episodes for each type of learner. 
-
-What do you see and how do you explain this 
-    (the difference may be somewhat subtle)?
-"""
-goal = (5, 5)
-original_goal=(1,1)
-new_goal=(5,5)
-goal_state = goal[0]*maze.shape[1] + goal[1]
-num_episodes = 1000
-num_steps = 400
-earned_rewards_clamped_list = np.zeros((20, 400, 1000))
-earned_rewards_relearned_list = np.zeros((20, 400, 1000))
-
-for i in range(20):
-    # Run with random-walk SR.
-    analytical_sr = random_walk_sr(transitions, 0.8).T
-    M, V, earned_rewards_clamped = actor_critic(analytical_sr_read_only, 
-                                                num_steps, 
-                                                    0.05, 0.99, num_episodes, 
-                                                    goal=new_goal)
-    
-    earned_rewards_clamped_list[i] = earned_rewards_clamped
-
-    # TODO: Run with updated SR.
-    re_learning_sr = random_walk_sr(transitions, 0.8).T
-    # Train to original goal
-    M, V, earned_rewards_relearned = actor_critic(re_learning_sr, num_steps, 
-                                                        0.05, 0.99, num_episodes,
-                                                        update_sr=True, goal=original_goal)
-    # Learn new goal. 
-    M, V, earned_rewards_relearned = actor_critic(re_learning_sr, num_steps, 
-                                                        0.05, 0.99, num_episodes, 
-                                                        update_sr=True, goal=new_goal)
-    
-    earned_rewards_relearned_list[i] = earned_rewards_relearned
-
 #%% Save results with pickle
 ## Use timestamp and save pickl file for part-4
-import datetime
-with open(f"{IMAGE_PATH}/part-4-results-{datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.bin", "wb") as f:
+with open(f"{IMAGE_PATH}/part-4-results-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.bin", "wb") as f:
     pickle.dump((earned_rewards_clamped_list, earned_rewards_relearned_list), f)
 
-#%%
 #%%
 # 20 - number of trials, 1000 number of episodes, 400 - number of steps
 # Plot the performance averages of the two types of learners
@@ -1078,5 +830,4 @@ plt.title("Constant Value Initialization")
 plt.legend()
 plt.savefig(f"{IMAGE_PATH}/part-5-constant-value_initialization.png")
 plt.show()
-## %%
 # %%
