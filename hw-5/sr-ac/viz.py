@@ -72,11 +72,11 @@ def animate_maze_values(v_weights_history, sr_history, maze_shape, output_path='
     fig, ax = plt.subplots(figsize=(maze_shape[1] * 2, maze_shape[0] * 2))  # Bigger figure
     maze_values = sr_history[0] @ v_weights_history[0]
     maze_values_grid = maze_values.reshape(maze_shape)
-    im = ax.imshow(maze_values_grid, cmap='hot', interpolation='nearest', vmin=0, vmax=np.max(maze_values_grid))
-    ax.set_title("Evolution of Maze Cell Values", fontsize=16)
+    im = ax.imshow(maze_values_grid, cmap='hot', interpolation='nearest', vmin=-10,  vmax=10) 
+    ax.set_title("Evolution of Maze Cell Values", fontsize=16 )
     ax.set_xlabel("Maze Columns", fontsize=12)
     ax.set_ylabel("Maze Rows", fontsize=12)
-    cbar = plt.colorbar(im, ax=ax)
+    cbar = plt.colorbar(im, ax=ax )
     cbar.set_label("Value", fontsize=12)
 
     # Add text annotations to each cell
@@ -84,7 +84,7 @@ def animate_maze_values(v_weights_history, sr_history, maze_shape, output_path='
     for i in range(maze_shape[0]):
         for j in range(maze_shape[1]):
             text = ax.text(j, i, f"{maze_values_grid[i, j]:.2f}",
-                           ha='center', va='center', color='white', fontsize=10)
+                           ha='center', va='center', color='black', fontsize=10)
             text_annotations.append(text)
 
     def update(frame):
@@ -108,7 +108,6 @@ def animate_maze_values(v_weights_history, sr_history, maze_shape, output_path='
 
 animate_maze_values(counters['V_weight_history'], counters['SR_history'], maze.shape, output_path='maze_values_evolution.mp4')
 #%%
-
 def animate_sr_tiles(sr_history, maze_shape, output_path='sr_evolution.mp4'):
     num_episodes, num_states, _ = sr_history.shape
 
@@ -122,7 +121,7 @@ def animate_sr_tiles(sr_history, maze_shape, output_path='sr_evolution.mp4'):
 
     # Initialize heatmaps for each state
     for ax in axes:
-        im = ax.imshow(np.zeros((maze_shape[0], maze_shape[1])), cmap='hot', interpolation='nearest', vmin=0, vmax=1)
+        im = ax.imshow(np.zeros((maze_shape[0], maze_shape[1])), cmap='hot', interpolation='nearest')
         ims.append(im)
         ax.axis('off')  # Turn off axes for clean display
 

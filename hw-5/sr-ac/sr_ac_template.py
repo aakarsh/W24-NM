@@ -563,9 +563,9 @@ plt.legend()
 plt.savefig(f"{IMAGE_PATH}/earned_rewards-part-2.png")
 plt.show()
    
-#%%
-# Part 3
+#%% Part-3
 np.random.seed(42)
+
 @numba.jit
 def pick_random_element(arr):
     idx = np.random.randint(0, len(arr))
@@ -577,9 +577,6 @@ def random_start(maze, goal):
                             for j in range(maze.shape[1]) 
                                 if check_legal(maze, (i, j)) and (i, j) != goal])
     return lambda: pick_random_element(free_states)
-
-plt.hist([random_start(maze, goal)() for i in range(1000)],  bins=np.arange(maze.size + 1) - 0.5)
-plt.show()
 
 start_func = random_start(maze, goal)
 learning_sr = random_walk_sr(transitions, 0.8).T
@@ -598,12 +595,11 @@ M, V, earned_rewards = actor_critic(learning_sr, n_steps,
                                         enable_performance_counters=True
                                         )
 part_3_random_start_sr = earned_rewards
-
 #%%
 plt.figure(figsize=(10, 5))
 plot_maze(maze)
-plt.title(f"State-value function : goal at {goal}")
-plt.imshow(V.reshape(maze.shape), cmap='hot')
+plt.title(f"State-value function : goal at {goal}, max: {np.max(V):.2f}, min: {np.min(V):.2f}")
+plt.imshow(V.reshape(maze.shape), cmap='hot', vmin=np.min(V), vmax=np.max(V))
 plt.colorbar()
 plt.savefig(f"{IMAGE_PATH}/values-part-3.png")
 plt.show()
@@ -618,8 +614,6 @@ plt.savefig(f"{IMAGE_PATH}/earned_rewards-part-3.png")
 plt.show()
 
 #%%
-plt.hist(V,  bins=np.arange(maze.size + 1) - 0.5)
-
 #%%
 # Plot the SR of some states after this learning, also anything else you want.
 #%% Plot the SR 
@@ -654,28 +648,34 @@ from joblib import Parallel, delayed
 # Define the function to be parallelized
 def run_experiment(i, transitions, maze_shape, num_steps, num_episodes, original_goal, new_goal):
     print("Running experiment", i)
-    sr_regularization = 0.85
+    # Run with updated SR
+    re_learning_sr = random_walk_sr(transitions, 0.8).T
+    start_func = random_start(maze, original_goal)
+
+ 
     # Run with random-walk SR
     analytical_sr = random_walk_sr(transitions, 0.8).T
     M, V, earned_rewards_clamped = actor_critic(
-        analytical_sr, num_steps, 0.05, 0.99, num_episodes, goal=new_goal,
-        sr_regularization=sr_regularization
+        analytical_sr, num_steps, 0.05, 0.99, num_episodes, 
+        goal=new_goal,
+        start_func=start_func
     )
     
-    # Run with updated SR
-    re_learning_sr = random_walk_sr(transitions, 0.8).T
     # Train to original goal
     _, _, _ = actor_critic(
         re_learning_sr, num_steps, 0.05, 0.99, num_episodes, 
         update_sr=True, goal=original_goal,
-        sr_regularization=sr_regularization
+        start_func=start_func,
+        sr_regularization=0.85,
     )
+    
     # Learn new goal
     M, V, earned_rewards_relearned = actor_critic(
         re_learning_sr, num_steps, 0.05, 0.99, num_episodes, 
-        update_sr=False, 
+        update_sr=True, 
         goal=new_goal,
-        sr_regularization=sr_regularization
+        start_func=start_func,
+        sr_regularization=0.85
     )
     return earned_rewards_clamped, earned_rewards_relearned
 
