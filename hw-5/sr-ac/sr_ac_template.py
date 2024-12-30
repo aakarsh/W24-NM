@@ -17,10 +17,10 @@ import maze_utils
 importlib.reload(maze_utils)
 
 from maze_utils import (
-                        make_maze, 
-                        plot_trajectory, 
                         update_sr_after_episode, 
+                        make_maze, 
                         plot_maze, 
+                        plot_trajectory, 
                         plot_stepwise_v_weights_history, 
                         plot_v_weights, 
                         plot_sr_history)
