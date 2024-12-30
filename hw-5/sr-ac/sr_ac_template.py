@@ -125,7 +125,7 @@ analytical_sr_read_only = analytical_sr[:]
 #   Using a table of action propensities M with softmax action selection
 # Critic:
 #   a Learned state-value function as critic
-#%% :- TODO
+#%% 
 @numba.jit
 def softmax(x):
     exp_x = np.exp(x - np.max(x))
@@ -370,8 +370,6 @@ def actor_critic(state_representation,
                 print("M[state_idx, :]:", M[state_idx, :])
                 print("state representation:", state_representation[state_idx])
                 print("v_weights:", V_weights)
-                plt.imshow(state_representation, cmap='hot') 
-                print(f"Propensites for state: {position_from_idx(state_idx, maze)} are {M[state_idx, :]}")
                 raise ValueError(f"Could not find a legal move after {max_checks} checks, No legal move for state: {position_from_idx(state_idx, maze)}")
            
             if enable_performance_counters: 
@@ -389,13 +387,13 @@ def actor_critic(state_representation,
             reward = goal_reach_reward if goal_reached else step_penalty
             # TD error 
             delta = reward + V_diff
-            # linear function \nabla_{V_weights} X(s)* V_weights  = X(s)
+            # Linear function \nabla_{V_weights} X(s)* V_weights  = X(s)
             V_weights += alpha * delta * state_representation[state_idx]
 
             if np.max(np.abs(V_weights)) > clip_weight_max_value:
                 if enable_performance_counters:
                     perf_counters["num_clipped_weights"] += len(V_weights[np.where(np.abs(V_weights) > clip_weight_max_value)])
-                #print(f"WARNING: V_weights: {num_overflow_weights} overflowing weights clipped weights") 
+                # print(f"WARNING: V_weights: {num_overflow_weights} overflowing weights clipped weights") 
                 V_weights = np.clip(V_weights, -clip_weight_max_value, clip_weight_max_value)
                  
             # Save history
@@ -427,62 +425,13 @@ def actor_critic(state_representation,
             
         # Update the state representation 
         if update_sr and len(trajectory) > 0: 
-            # print(f"Updating SR - Episode {episode_idx}- Trajectory: {[position_from_idx(idx, maze) for idx in trajectory]}") 
             state_representation = np.copy(update_sr_after_episode(state_representation, trajectory, gamma, alpha, regularization=sr_regularization))
             # Save the state representation history
             SR_history[episode_idx, :, :] = np.copy(state_representation)
-            # al sr values are between 0 and 1
+            
             assert (state_representation >= 0).all(), "state representation should be positive" 
             assert (state_representation <= 1/(1-gamma)).all(), "state representation should be less than 1"
 
-            if debug and episode_idx % 50 == 0:
-                # step wise SR
-                plt.figure()
-                plt.title(f"Episode {episode_idx} - SR")
-                # plot_stepwise_v_weights_history(V_weight_history_step_wise, episode_idx)   
-                
-                plt.title(f"Episode {episode_idx} - Updating SR")
-                plt.imshow(state_representation, cmap='hot') 
-                plt.savefig(f"{IMAGE_PATH}/sr-update-episode-{episode_idx}.png")
-                
-                # v_weights on maze.
-                plt.title(f"Episode {episode_idx} - V-Weights")
-                plot_maze(maze)
-                plt.imshow((V_weights).reshape(maze.shape), cmap='hot')
-                plt.savefig(f"{IMAGE_PATH}/v-weights-episode-{episode_idx}.png") 
-                # Propensities 
-                # plt.title(f"Episode {episode_idx} - Propensities")
-                # for action in range(4):
-                #    plt.imshow(M[:, action].reshape(maze.shape), cmap='hot', vmin=0, vmax=1)
-                #    plt.savefig(f"{IMAGE_PATH}/propensities-episode-{episode_idx}-action-{action}.png")
-                
-                # 3D plot of v-weights with time axis and state axis 
-                print(f"Episode {episode_idx} - Plotting V-Weights")
-                plot_v_weights(V_weight_history, episode_idx)
-                
-                
-                print(f"Episode {episode_idx} - Plotting SR")
-                for tracked_state_idx in tracked_states:
-                    plot_sr_history(SR_history, episode_idx, tracked_state_idx) 
-                r_display = np.zeros(maze.size)
-                goal_idx = position_idx(goal[0], goal[1], maze)
-                r_display[goal_idx] = 1
-                expected_value_display = r_display @ state_representation 
-                print(f"Episode {episode_idx} - Updating SR")
-                plt.figure()
-                plt.title(f"Episode {episode_idx} SR Rewards View") 
-                plot_maze(maze)
-                plt.imshow(expected_value_display.reshape(maze.shape), cmap='hot')
-                plt.savefig(f"{IMAGE_PATH}/sr-rewards-episode-{episode_idx}.png")
-                plt.close()
-                v_display = V_weights @ state_representation
-                plt.figure()
-                plt.title(f"Episode {episode_idx} V-Weights Rewards View")
-                plot_maze(maze)
-                plt.imshow(v_display.reshape(maze.shape), cmap='hot')
-                plt.savefig(f"{IMAGE_PATH}/v-weights-rewards-episode-{episode_idx}.png")
-                plt.show()
-                
     # Reward only for reaching the goal, thus episode reward is 
     # same as Discounted last step reward.
     if enable_performance_counters:
@@ -595,6 +544,7 @@ M, V, earned_rewards = actor_critic(learning_sr, n_steps,
                                         enable_performance_counters=True
                                         )
 part_3_random_start_sr = earned_rewards
+
 #%%
 plt.figure(figsize=(10, 5))
 plot_maze(maze)
@@ -640,7 +590,6 @@ for state_idx in range(maze.size):
         plt.savefig(f"{IMAGE_PATH}/sr-state-{state_idx}-part-4.png")
         plt.show()
 
-#%% Plot the SR 
 #%% Part-4 Parallel
 import numpy as np
 from joblib import Parallel, delayed

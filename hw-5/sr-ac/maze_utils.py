@@ -109,13 +109,6 @@ def position_from_idx(position_idx, maze):
 
 #%%
 @numba.jit
-def normal_start():
-    # suggested encoding of 2D location onto states
-    i, j = start
-    state =  position_idx(i,j, maze) 
-    return state
-
-@numba.jit
 def is_inside_maze(maze, move):
     return move[0] >= 0 and move[0] < maze.shape[0] and move[1] >= 0 and move[1] < maze.shape[1]
 
@@ -244,16 +237,11 @@ def learn_from_traj(succ_repr, trajectory, gamma=0.98, alpha=0.05, debug=False):
     #       discount factor gamma 
     #       learning rate alpha
     observed = np.zeros_like(succ_repr)
-    #if debug: print(f"learn_from_traj: {trajectory}") 
     for i, state in enumerate(trajectory):
-        #if debug: print(f"learn_from_traj: state: {state}")
         observed[state] += gamma ** i
     assert (observed >= 0).all(), "observed should be positive"
     #assert (succ_repr >= 0).all(), "succ_repr should be positive"
     delta =  observed - succ_repr
-    #if debug: print(f"delta: {delta}")
-    #if debug: print(f"successor: {succ_repr}, observed: {observed}, total-delta:{np.sum(np.square(delta))}")
-    # if np.sum(np.abs(delta)) >0 : print("non-zero-delta: ", np.sum(np.abs(delta)))
     succ_repr += alpha * delta 
     # assert (succ_repr >= 0).all(), "succ_repr should remain positive"
     # Return the updated successor representation
@@ -305,13 +293,10 @@ def update_sr_after_episode(state_representation, trajectory,
         for i in range(state_representation.shape[0]):
             for j in range(state_representation.shape[1]):
                 if np.abs(state_representation[i, j] - old_state_representation[i, j]) > 0:
-                    if debug: print(f"state: {i, j}, old: {old_state_representation[i, j]}, new: {state_representation[i, j]}")
-                    if debug: print(f"difference: {state_representation[i, j] - old_state_representation[i, j]}")
+                    print(f"state: {i, j}, old: {old_state_representation[i, j]}, new: {state_representation[i, j]}")
+                    print(f"difference: {state_representation[i, j] - old_state_representation[i, j]}")
                 #if debug: print(f"Altered transition from {position_from_idx(i, maze)} to {position_from_idx(j, maze)}")
-                
-    #assert not np.allclose(old_state_representation, state_representation)
-    total_change = np.sum(np.abs(old_state_representation - state_representation))
-    if debug: 
+        total_change = np.sum(np.abs(old_state_representation - state_representation))
         print(f"total-change: {total_change}")
+        
     return new_state_representation
- 
