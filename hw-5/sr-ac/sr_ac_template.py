@@ -1,6 +1,5 @@
 #%%
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import pickle
 from datetime import datetime
@@ -9,7 +8,6 @@ import numba
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns 
-import pandas as pd
 from scipy.ndimage import gaussian_filter
 
 import importlib
@@ -458,7 +456,6 @@ def actor_critic(state_representation,
    
 #%%
 # Part 1
-#%%
 original_goal=(1,1)
 M, V, earned_rewards = actor_critic(np.eye(maze.size), n_steps=300, 
                                         alpha=0.05, gamma=0.99, n_episodes=1000, 

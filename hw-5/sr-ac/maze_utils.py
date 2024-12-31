@@ -139,6 +139,51 @@ def reachable_moves(maze, pos):
     legal_moves = [move for move in possible_moves if check_legal(maze, move)]
     return legal_moves 
 
+#%%
+# One part to the solution of exercise part 3, if you want to update the 
+# SR after each episode
+def learn_from_traj(succ_repr, trajectory, gamma=0.98, alpha=0.05, debug=False):
+    # Write a function to update a given successor representation 
+    # (for the state at which the trajectory starts) using an 
+    # example trajectory using:
+    #       discount factor gamma 
+    #       learning rate alpha
+    observed = np.zeros_like(succ_repr)
+    for i, state in enumerate(trajectory):
+        observed[state] += gamma ** i
+    assert (observed >= 0).all(), "observed should be positive"
+    #assert (succ_repr >= 0).all(), "succ_repr should be positive"
+    delta =  observed - succ_repr
+    succ_repr += alpha * delta 
+    # Return the updated successor representation
+    return succ_repr
+
+def update_sr_after_episode(state_representation, trajectory, 
+                            gamma=0.98, alpha=0.05, debug=False, 
+                            regularization=0.05):
+    """
+    """
+    old_state_representation = np.copy(state_representation)
+    trajectory = np.array(trajectory)
+    new_state_representation = np.copy(state_representation) 
+    for idx, state_idx in enumerate(trajectory):
+        if debug: 
+            print(f"state_idx: {state_idx}") 
+        current_trajectory = trajectory[idx:]
+        if debug: 
+            print(f"current_trajectory: {current_trajectory}")
+        # Update the state representation for the state at which the trajectory starts
+        updated_values = learn_from_traj(state_representation[state_idx, :], 
+                            current_trajectory, gamma, alpha, 
+                            debug=debug)
+ 
+        new_state_representation[state_idx, :] = \
+            (1 - regularization) * updated_values + \
+            regularization * old_state_representation[state_idx, :]
+
+    return new_state_representation
+
+
 def plot_sr_history(SR_history, episode_idx, state_idx):
     """
     Plot the history of SR over time and states
@@ -225,78 +270,3 @@ def plot_v_weights(V_weight_history, episode_idx):
     # Save the figure
     plt.savefig(f"{IMAGE_PATH}/v-weights-history-episode-{episode_idx}.png")
     plt.close(fig)  # Close the figure to free up memory
-
-
-#%%
-# One part to the solution of exercise part 3, if you want to update the 
-# SR after each episode
-def learn_from_traj(succ_repr, trajectory, gamma=0.98, alpha=0.05, debug=False):
-    # Write a function to update a given successor representation 
-    # (for the state at which the trajectory starts) using an 
-    # example trajectory using:
-    #       discount factor gamma 
-    #       learning rate alpha
-    observed = np.zeros_like(succ_repr)
-    for i, state in enumerate(trajectory):
-        observed[state] += gamma ** i
-    assert (observed >= 0).all(), "observed should be positive"
-    #assert (succ_repr >= 0).all(), "succ_repr should be positive"
-    delta =  observed - succ_repr
-    succ_repr += alpha * delta 
-    # assert (succ_repr >= 0).all(), "succ_repr should remain positive"
-    # Return the updated successor representation
-    return succ_repr
-
-def update_sr_after_episode(state_representation, trajectory, 
-                            gamma=0.98, alpha=0.05, 
-                            debug=False, 
-                            regularization=0.05):
-    old_state_representation = np.copy(state_representation)
-    trajectory = np.array(trajectory)
-    new_state_representation = np.copy(state_representation) 
-    for idx, state_idx in enumerate(trajectory):
-        if debug: 
-            print(f"state_idx: {state_idx}") 
-        current_trajectory = trajectory[idx:]
-        if debug: 
-            print(f"current_trajectory: {current_trajectory}")
-        # Update the state representation for the state at which the trajectory starts
-        updated_values = learn_from_traj(state_representation[state_idx, :], 
-                            current_trajectory, gamma, alpha, 
-                            debug=debug)
- 
-        new_state_representation[state_idx, :] = \
-            (1 - regularization) * updated_values + \
-            regularization * old_state_representation[state_idx, :]
-
-       
-    if debug: 
-        # Figure with row of three images
-        plt.figure(figsize=(15, 30))
-        ax = plt.subplot(1, 3, 1)
-        ax.set_title("Old State Representation")
-        plt.imshow(old_state_representation, cmap='hot')
-        plt.colorbar()
-        
-        ax = plt.subplot(1, 3, 2)
-        ax.set_title("New State Representation")
-        plt.imshow(state_representation, cmap='hot')
-        plt.colorbar()
-        
-        ax = plt.subplot(1, 3, 3)
-        ax.set_title(f"Change: Trajectory: {trajectory}")
-        plt.imshow(state_representation - old_state_representation, cmap='hot')
-        plt.colorbar()
-        plt.show()
-
-    if debug:
-        for i in range(state_representation.shape[0]):
-            for j in range(state_representation.shape[1]):
-                if np.abs(state_representation[i, j] - old_state_representation[i, j]) > 0:
-                    print(f"state: {i, j}, old: {old_state_representation[i, j]}, new: {state_representation[i, j]}")
-                    print(f"difference: {state_representation[i, j] - old_state_representation[i, j]}")
-                #if debug: print(f"Altered transition from {position_from_idx(i, maze)} to {position_from_idx(j, maze)}")
-        total_change = np.sum(np.abs(old_state_representation - state_representation))
-        print(f"total-change: {total_change}")
-        
-    return new_state_representation
