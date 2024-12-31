@@ -47,7 +47,6 @@ maze[2:-3, 6] = 1
 
 # Define start
 start = (5, 7)
-
 #%%
 # Define goal (we abuse function scoping a bit here, later we will change the goal, 
 # which will automatically change the goal in our actor critic as well)

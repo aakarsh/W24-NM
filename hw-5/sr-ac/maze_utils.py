@@ -4,11 +4,7 @@ import os
 import numba
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns 
-import pandas as pd
-from scipy.ndimage import gaussian_filter
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
 #%%
