@@ -254,6 +254,7 @@ def actor_critic(state_representation,
                      'M_history_step_wise': None, 
                      'V_weight_history': None,
                      'V_weight_history_step_wise': None,
+                     'start_state_history': None,
                      "locals" : {
                          'sr_regularization': sr_regularization,
                          "n_steps": n_steps, 
@@ -286,7 +287,7 @@ def actor_critic(state_representation,
     SR_history = np.zeros((n_episodes, num_states, num_states))
     M_history = np.zeros((n_episodes, num_states, 4))
     M_history_step_wise = np.zeros((n_episodes, n_steps, num_states, 4))
-
+    start_state_history = np.zeros(n_episodes)
     # Iterate over episodes
     for episode_idx in range(n_episodes):
         # Initializations
@@ -298,10 +299,11 @@ def actor_critic(state_representation,
             perf_counters["num_episodes"] += 1
         
         state_idx = start_func()
-        
+        start_state_history[episode_idx] = state_idx 
+
         if debug and episode_idx % 100 == 0: 
             print(f"Episode: {episode_idx}  Starting: {position_from_idx(state_idx, maze)}") 
-        
+             
         # Cumulative discount factor
         I = 1
         # episode trajectory
@@ -433,6 +435,7 @@ def actor_critic(state_representation,
     # same as Discounted last step reward.
     if enable_performance_counters:
         perf_counters["episode_counters"] = episode_counters
+        
          
     if debug and enable_performance_counters: 
         print(perf_counters)
@@ -444,6 +447,7 @@ def actor_critic(state_representation,
         perf_counters["SR_history"] = SR_history
         perf_counters["M_history"] = M_history
         perf_counters["M_history_step_wise"] = M_history_step_wise
+        perf_counters["start_state_history"] = start_state_history
         
     if enable_performance_counters: 
         pickle_file_name = f"{IMAGE_PATH}/perf_counters-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.bin"
@@ -516,14 +520,14 @@ def pick_random_element(arr):
     idx = np.random.randint(0, len(arr))
     return arr[idx]
 
-def random_start(maze, goal):
+def random_start(maze):
     free_states = np.array([position_idx(i, j, maze) 
                         for i in range(maze.shape[0]) 
                             for j in range(maze.shape[1]) 
-                                if check_legal(maze, (i, j)) and (i, j) != goal])
+                                if check_legal(maze, (i, j))])
     return lambda: pick_random_element(free_states)
 
-start_func = random_start(maze, goal)
+start_func = random_start(maze)
 learning_sr = random_walk_sr(transitions, 0.8).T
 n_steps = 300 # 300 steps per episode
 n_episodes = 1000  # explosion  in v_weights
@@ -531,7 +535,7 @@ n_episodes = 1000  # explosion  in v_weights
 alpha = 0.05 
 gamma = 0.99 
 sr_regularization=0.85
-M, V, earned_rewards = actor_critic(learning_sr, n_steps, 
+M, V, earned_rewards = actor_critic(np.random.random((117, 117)) , n_steps, 
                                         alpha, gamma, n_episodes,
                                         update_sr=True, 
                                         start_func=start_func, 
@@ -556,10 +560,9 @@ plt.plot(gaussian_filter(earned_rewards, 30), label='random-start-sr')
 plt.plot(gaussian_filter(part_2_sr_random_policy_earned_rewards, 30),label='fixed-start-sr')
 plt.plot(gaussian_filter(part_1_one_hot_earned_rewards, 30), label='fixed-start-1-hot')
 plt.legend()
-plt.savefig(f"{IMAGE_PATH}/earned_rewards-part-3.png")
+plt.savefig(f"{IMAGE_PATH}/part-3-earned_rewards.png")
 plt.show()
 
-#%%
 #%%
 # Plot the SR of some states after this learning, also anything else you want.
 #%% Plot the SR 
@@ -569,7 +572,7 @@ plt.plot(learning_sr[1, :])
 plt.figure(figsize=(20,15))
 plt.imshow(learning_sr, cmap='hot')
 plt.colorbar()
-plt.savefig("sr-part-4.png")
+plt.savefig("sr-part-3.png")
 
 
 original_random_walk_sr = np.copy(random_walk_sr(transitions, 0.8).T)
@@ -580,10 +583,9 @@ for state_idx in range(maze.size):
         delta = learning_sr[state_idx, :].reshape(maze.shape) - original_random_walk_sr[state_idx, :].reshape(maze.shape)
         total_error = np.sum(np.square(delta))
         plt.imshow(learning_sr[state_idx, :].reshape(maze.shape), cmap='hot')
-        #plt.imshow(delta, cmap='hot')
         plt.title(f"SR for state {position_from_idx(state_idx,maze)} Random Walk Deviation:{total_error:.2f}")
         plt.colorbar()
-        plt.savefig(f"{IMAGE_PATH}/sr-state-{state_idx}-part-4.png")
+        plt.savefig(f"{IMAGE_PATH}/sr-state-part-3-{state_idx}.png")
         plt.show()
 
 #%% Part-4 Parallel
@@ -594,10 +596,7 @@ from joblib import Parallel, delayed
 def run_experiment(i, transitions, maze_shape, num_steps, num_episodes, original_goal, new_goal):
     print("Running experiment", i)
     # Run with updated SR
-    re_learning_sr = random_walk_sr(transitions, 0.8).T
-    start_func = random_start(maze, original_goal)
-
- 
+    start_func = normal_start 
     # Run with random-walk SR
     analytical_sr = random_walk_sr(transitions, 0.8).T
     M, V, earned_rewards_clamped = actor_critic(
@@ -605,8 +604,10 @@ def run_experiment(i, transitions, maze_shape, num_steps, num_episodes, original
         goal=new_goal,
         start_func=start_func
     )
-    
-    # Train to original goal
+  #random_walk_sr(transitions, 0.8).T 
+    re_learning_sr = np.random.random((117, 117)) 
+     
+    # Train to original goal - (1,1)
     _, _, _ = actor_critic(
         re_learning_sr, num_steps, 0.05, 0.99, num_episodes, 
         update_sr=True, goal=original_goal,
@@ -614,7 +615,7 @@ def run_experiment(i, transitions, maze_shape, num_steps, num_episodes, original
         sr_regularization=0.85,
     )
     
-    # Learn new goal
+    # Learn new goal - (5,5)
     M, V, earned_rewards_relearned = actor_critic(
         re_learning_sr, num_steps, 0.05, 0.99, num_episodes, 
         update_sr=True, 
@@ -626,14 +627,15 @@ def run_experiment(i, transitions, maze_shape, num_steps, num_episodes, original
 
 
 # Parameters
-goal = (5, 5)
+#goal = (5, 5)
+# goal_state = goal[0] * maze.shape[1] + goal[1]
+
 original_goal = (1, 1)
 new_goal = (5, 5)
-goal_state = goal[0] * maze.shape[1] + goal[1]
 num_episodes = 1000
-num_steps = 400
-earned_rewards_clamped_list = np.zeros((20, 400, 1000))
-earned_rewards_relearned_list = np.zeros((20, 400, 1000))
+num_steps = 300
+earned_rewards_clamped_list = np.zeros((20, num_steps, num_episodes))
+earned_rewards_relearned_list = np.zeros((20, num_steps, num_episodes))
 
 # Parallel execution using Joblib
 results = Parallel(n_jobs=-1)(delayed(run_experiment)(

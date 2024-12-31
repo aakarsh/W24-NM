@@ -121,7 +121,8 @@ def animate_sr_tiles(sr_history, maze_shape, output_path='sr_evolution.mp4'):
 
     # Initialize heatmaps for each state
     for ax in axes:
-        im = ax.imshow(np.zeros((maze_shape[0], maze_shape[1])), cmap='hot', interpolation='nearest')
+        im = ax.imshow(np.zeros((maze_shape[0], maze_shape[1])), 
+                                        cmap='hot', interpolation='nearest')
         ims.append(im)
         ax.axis('off')  # Turn off axes for clean display
 
@@ -134,11 +135,76 @@ def animate_sr_tiles(sr_history, maze_shape, output_path='sr_evolution.mp4'):
         fig.suptitle(f"Episode {frame}", fontsize=16)
         return ims
 
-    ani = animation.FuncAnimation(fig, update, frames=range(num_episodes), interval=200, blit=True)
+    ani = animation.FuncAnimation(fig, update, frames=range(num_episodes)[:100], interval=200, blit=True)
     ani.save(output_path, fps=10, writer='ffmpeg')
     plt.close(fig)
 
-print("run")
 counters = parse_pickle_file(find_most_recent_file(dump_file_path))
 animate_sr_tiles(counters['SR_history'], maze.shape, output_path='sr_evolution.mp4')
+print("SR evolution animation saved to 'sr_evolution.mp4'")
 #%%
+
+def plot_final_sr_frame(sr_history, maze_shape, output_path='final_sr_frame.png'):
+    """
+    Plot the final learned successor representation (SR) frame.
+    
+    """
+    num_episodes, num_states, _ = sr_history.shape
+
+    if num_states != np.prod(maze_shape):
+        raise ValueError("Mismatch between number of states and maze size.")
+
+    # Final episode data
+    final_sr = sr_history[-1]
+
+    # Create figure and axes
+    fig, axes = plt.subplots(maze_shape[0], maze_shape[1], figsize=(maze_shape[1] * 2, maze_shape[0] * 2))
+    axes = axes.flatten()
+
+    # Plot heatmap for each state
+    for state_idx, ax in enumerate(axes):
+        sr_values = final_sr[state_idx, :].reshape(maze_shape)
+        im = ax.imshow(sr_values, cmap='hot', interpolation='nearest')
+        ax.axis('off')  # Turn off axes for clean display
+    
+    fig.suptitle("Final Learned Successor Representations", fontsize=16)
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.show()
+
+# Example usage
+counters = parse_pickle_file(find_most_recent_file(dump_file_path))
+plot_final_sr_frame(counters['SR_history'], maze.shape, output_path='final_sr_frame.png')
+
+# %%
+counters = parse_pickle_file(find_most_recent_file(dump_file_path))
+
+def plot_start_state_history(start_state_history, maze_shape, output_path='start_state_history.png'):
+    """
+    Plot an image which shows the number of times each state was visited as the start
+    of an episode. This can help to visualize the exploration of the agent. 
+    """
+    if len(start_state_history) == 0:
+        raise ValueError("No start state history found in the counters.")
+    
+    # Compute the number of times each state was visited as the start of an episode 
+    visit_frequency = np.zeros(np.prod(maze_shape))
+    for state_idx in start_state_history.tolist():
+        visit_frequency[int(state_idx)] += 1
+    # Plot the heatmap
+    fig, ax = plt.subplots(figsize=(maze_shape[1] * 2, maze_shape[0] * 2))
+    im = ax.imshow(visit_frequency.reshape(maze_shape), cmap='hot', interpolation='nearest')
+    ax.set_title("Start State History", fontsize=16)
+    ax.set_xlabel("Maze Columns", fontsize=12)
+    ax.set_ylabel("Maze Rows", fontsize=12)
+    cbar = plt.colorbar(im, ax=ax)
+    cbar.set_label("Number of Starts", fontsize=12)
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.show()
+    
+    
+plot_start_state_history(counters['start_state_history'], maze.shape, output_path='start_state_history.png')
+
+
+# %%
