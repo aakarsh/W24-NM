@@ -48,12 +48,13 @@ clock = pygame.time.Clock()
 # Initialize game modes
 mask_mode= True
 target_mode = 'fix'  # Mode for angular shift of target: random, fix, dynamic
-perturbation_mode= True # AN: True for perturbation, False for no perturbation
+perturbation_mode= False # AN: True for perturbation, False for no perturbation
 perturbation_type= 'sudden' # Mode for angular shift of control: random, gradual or sudden
 perturbation_angle = math.radians(PERTURBATION_ANGLE)  # Angle between mouse_pos and circle_pos
 perturbed_mouse_angle = 0
 gradual_step = 0
 gradual_attempts = 1
+prev_gradual_attempts = 0
 perturbation_rand=random.uniform(-math.pi/4, +math.pi/4)
 
 error_angles = []  # List to store error angles
@@ -97,9 +98,10 @@ def compute_perturbed_position(start_pos, distance,  angle):
 
 # Main game loop
 running = True
+current_step = 0
 while running:
     screen.fill(BLACK)
-
+    current_step += 1
     # Event handling
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -152,7 +154,6 @@ while running:
 
     # TASK1: CALCULATE perturbed_mouse_pos
     # PRESS 'h' in game for a hint
-    step_counter = 0
     if perturbation_mode:
         if perturbation_type == 'sudden':
             # sudden clockwise perturbation of perturbation_angle
@@ -162,12 +163,21 @@ while running:
             perturbed_mouse_angle = mouse_angle + perturbation_angle 
         elif perturbation_type == 'gradual':   
             # Gradual counterclockwise perturbation of perturbation_angle 
-            # in 10 steps, with perturbation_angle/10, 
-            # Each step lasts 3 attempts <- 
+            # Perturbation angle is 3 degrees in each step.
+            # Each step lasts 3 attempts
+            # There are 10 steps in total before step counter resets.
             perturbed_mouse_angle = mouse_angle - gradual_step * (perturbation_angle / 10)
-            if attempts % 3 == 0: # Attempts then increase it.  
+
+            # Each step lasts 3 attempts, We increase gradual_step only if gradual_attempts has changed.
+            if gradual_attempts % 3 == 0 and not prev_gradual_attempts == gradual_attempts: # Attempts then increase it.  
                 gradual_step += 1
-            
+
+            # After we reach 10 steps, we reset the gradual step.
+            if gradual_step >= 10: # Reset the gradual_step after 10 steps
+                gradual_step = 0
+                
+            prev_gradual_attempts = gradual_attempts
+
         perturbed_mouse_pos = compute_perturbed_position(START_POSITION, distance, perturbed_mouse_angle)
         assert len(perturbed_mouse_pos) == 2, "The perturbed_mouse_pos should be a tuple with 2 elements"
         circle_pos = perturbed_mouse_pos
