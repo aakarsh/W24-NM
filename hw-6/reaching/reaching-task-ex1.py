@@ -6,9 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Game parameters
-SCREEN_X, SCREEN_Y = 3840, 2160 # your screen resolution
-# WIDTH, HEIGHT = SCREEN_X // 1.5  , SCREEN_Y // 1.5 # be aware of monitor scaling on windows (150%)
-WIDTH, HEIGHT = SCREEN_X // 3.5  , SCREEN_Y // 3.5 # be aware of monitor scaling on windows (150%)
+SCREEN_X, SCREEN_Y = 1789, 1120 # 3840, 2160 # Your screen resolution
+WIDTH, HEIGHT = SCREEN_X // 1.5  , SCREEN_Y // 1.5 # be aware of monitor scaling on windows (150%)
 
 CIRCLE_SIZE = 20
 TARGET_SIZE = CIRCLE_SIZE
@@ -50,7 +49,7 @@ clock = pygame.time.Clock()
 mask_mode= True
 target_mode = 'fix'  # Mode for angular shift of target: random, fix, dynamic
 perturbation_mode= True # AN: True for perturbation, False for no perturbation
-perturbation_type= 'sudden' # Mode for angular shift of controll: random, gradual or sudden
+perturbation_type= 'sudden' # Mode for angular shift of control: random, gradual or sudden
 perturbation_angle = math.radians(PERTURBATION_ANGLE)  # Angle between mouse_pos and circle_pos
 perturbed_mouse_angle = 0
 gradual_step = 0
@@ -60,7 +59,7 @@ perturbation_rand=random.uniform(-math.pi/4, +math.pi/4)
 error_angles = []  # List to store error angles
 
 # Flag for showing mouse position and deltas
-show_mouse_info = False
+show_mouse_info = True
 
 # Function to generate a new target position
 def generate_target_position():
@@ -88,6 +87,14 @@ def at_start_position_and_generate_target(mouse_pos):
         return True
     return False
 
+def compute_perturbed_position(start_pos, distance,  angle):
+    """
+    Function to calculate new position of the circle cursor 
+    """
+    new_x = start_pos[0] + distance * math.cos(angle)
+    new_y = start_pos[1] + distance * math.sin(angle)
+    return new_x, new_y
+
 # Main game loop
 running = True
 while running:
@@ -108,6 +115,15 @@ while running:
                 show_mouse_info = not show_mouse_info
             
     # Design experiment
+    '''
+    AN: The experiment consists of the following phases.
+    
+    1. No perturbation      - (  1-40)
+    2. Gradual perturbation - ( 41-80)
+    3. No perturbation      - ( 81-120)
+    4. Sudden perturbation  - (121-160)
+    5. No perturbation      - (161-200)
+    '''
     if attempts == 1:
         perturbation_mode = False
     elif attempts == 40:
@@ -139,8 +155,10 @@ while running:
     step_counter = 0
     if perturbation_mode:
         if perturbation_type == 'sudden':
-            #sudden clockwise perturbation of perturbation_angle
-            # print(f"Perturbation_angle: {perturbation_angle}")
+            # sudden clockwise perturbation of perturbation_angle
+            '''
+            AN: Implement a *sudden* *clockwise* perturbation of 30°.
+            '''
             perturbed_mouse_angle = mouse_angle + perturbation_angle 
         elif perturbation_type == 'gradual':   
             # Gradual counterclockwise perturbation of perturbation_angle 
@@ -150,17 +168,7 @@ while running:
             if attempts % 3 == 0: # Attempts then increase it.  
                 gradual_step += 1
             
-        def new_position(mouse_angle):
-            """
-            Deadline is right before the next exercise.
-            For disussion might be worht it for next lecture.
-            """
-            new_x = START_POSITION[0] + distance * math.cos(mouse_angle)
-            new_y = START_POSITION[1] + distance * math.sin(mouse_angle)
-            return new_x, new_y
- 
-        perturbed_mouse_pos = new_position(perturbed_mouse_angle)
-        
+        perturbed_mouse_pos = compute_perturbed_position(START_POSITION, distance, perturbed_mouse_angle)
         assert len(perturbed_mouse_pos) == 2, "The perturbed_mouse_pos should be a tuple with 2 elements"
         circle_pos = perturbed_mouse_pos
     else:
@@ -231,7 +239,7 @@ while running:
 
     # Show score
     font = pygame.font.Font(None, 36)
-    score_text = font.render(f"Score: {score} Pertubation: {perturbation_type}, Mouse Angle: {math.degrees(mouse_angle):.2f} Perturbation Angle: {math.degrees(perturbed_mouse_angle):.2f}", True, WHITE)
+    score_text = font.render(f"Score: {score} Pertrubation On:{perturbation_mode} Pertubation: {perturbation_type}, Mouse Angle: ({mouse_angle:.2f}) {math.degrees(mouse_angle):.2f} Perturbation Angle:({perturbed_mouse_angle:.2f}) {math.degrees(perturbed_mouse_angle):.2f} ", True, WHITE)
     screen.blit(score_text, (10, 10))
 
     # Show attempts
@@ -256,4 +264,32 @@ pygame.quit()
 
 ## TASK 2, CALCULATE, PLOT AND SAVE (e.g. export as .csv) ERRORS from error_angles
 
+
 sys.exit()
+'''
+- TASK 1: Implementation of perturbation:
+    - Implement a sudden clockwise perturbation of 30°
+    - Implement a gradual counterclockwise perturbation of 3°(10 steps, 3 attempts each)
+
+- TASK 2: Analysis of experiment on unbiased subjects:
+
+    - Calculate the signed error_angles between target and circle cursor,
+    exclude slow attempts where ‚MOVE FASTER‘ appeared.
+    
+    - Plot the error angles over all attempts and highlight the experiment’s segments
+    
+    - What‘s the motor variability (MV) in the unperturbed segements?
+    
+    - Run the experiment a second time with mask_mode=false. What do you observe in
+      subject‘s movements in the now unmasked part?
+   
+- TASK 3: Discussion of your results
+
+    - What do you see when perturbation is introduced? Is there an after-effect? What is the
+    difference between gradual and sudden perturbation? Why is it important to mask the
+    last part of the trajectory?
+    
+- TASK 4: One sentence on what you did. One sentence why it 
+          was interesting to you
+
+'''
