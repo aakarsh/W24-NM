@@ -58,6 +58,7 @@ prev_gradual_attempts = 0
 perturbation_rand=random.uniform(-math.pi/4, +math.pi/4)
 
 error_angles = []  # List to store error angles
+error_angle = 0
 
 # Flag for showing mouse position and deltas
 show_mouse_info = True
@@ -95,6 +96,33 @@ def compute_perturbed_position(start_pos, distance,  angle):
     new_x = start_pos[0] + distance * math.cos(angle)
     new_y = start_pos[1] + distance * math.sin(angle)
     return new_x, new_y
+
+def compute_error_angle(start_position, target, circle_pos):
+    s = np.array(start_position)  
+    t = np.array(target)  
+    c = np.array(circle_pos)  
+
+    A = t - s
+    B = c - s
+    dot_product = np.dot(A, B)
+    magnitude_A = np.linalg.norm(A)
+    magnitude_B = np.linalg.norm(B)
+    # Compute the cosine of the angle
+    cos_theta = dot_product / (magnitude_A * magnitude_B)
+
+    # Compute the angle in radians and degrees
+    angle_radians = np.arccos(cos_theta)
+    angle_degrees = np.degrees(angle_radians)
+    # Equivalent to A_x * B_y - A_y * B_x 
+    det = A[0] * B[1] - A[1] * B[0]  
+
+    # Compute the signed angle using atan2(det, dot_product)
+    signed_angle_radians = np.arctan2(det, dot_product)
+    signed_angle_degrees = np.degrees(signed_angle_radians)
+
+    assert np.isclose(angle_degrees, np.abs(signed_angle_degrees)), "The angle in degrees should equal the magnitude of the signed angle."
+    # assuming clock wise error is negative.
+    return signed_angle_degrees 
 
 # Main game loop
 running = True
@@ -191,7 +219,7 @@ while running:
         attempts += 1
 
         # CALCULATE AND SAVE ERRORS between target and circle end position for a hit
-        error_angle = float("NaN")
+        error_angle = compute_error_angle(START_POSITION, new_target, circle_pos) 
         error_angles.append(error_angle)
 
         new_target = None  # Set target to None to indicate hit
@@ -204,7 +232,7 @@ while running:
         attempts += 1
 
         # CALCULATE AND SAVE ERRORS between target and circle end position for a miss
-        error_angle = float("NaN")
+        error_angle = compute_error_angle(START_POSITION, new_target, circle_pos) #float("NaN")
         error_angles.append(error_angle)
 
         new_target = None  # Set target to None to indicate miss
@@ -264,6 +292,8 @@ while running:
         screen.blit(mouse_info_text, (10, 60))
         screen.blit(delta_info_text, (10, 90))
         screen.blit(mouse_angle_text, (10, 120))
+        error_angle_text = font.render(f"Error_Ang: {np.rint(error_angle)}", True, WHITE)
+        screen.blit(error_angle_text, (10, 140))
 
     # Update display
     pygame.display.flip()
