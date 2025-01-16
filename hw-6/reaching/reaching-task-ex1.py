@@ -312,27 +312,33 @@ pygame.quit()
 #%%
 from matplotlib import pyplot as plt
 import pandas as pd
-#%%
+import seaborn as sns
+
+sns.set_theme(style="whitegrid")
+#%% # Read the generated error angles file.
 df = pd.DataFrame(error_angles, columns=['Error_Angles'])
 df.to_csv('error_angles.csv', index=False)
-
 #%%
 error_angles = pd.read_csv('error_angles.csv')
 # Plot the error angles over all attempts and highlight the experiment’s segments
-error_angles_masked = np.ma.masked_invalid(df['Error_Angles'])
-
 #%%
+error_angles_masked = np.ma.masked_invalid(df['Error_Angles'])
+plt.figure(figsize=(15, 9))
 plt.plot(error_angles_masked)
 plt.xlabel('Attempts')
 plt.ylabel('Error Angles')
 plt.title('Error Angles over all attempts')
-plt.axvline(x=40, color='r', linestyle='--', label='Gradual Perturbation')
-plt.axvline(x=80, color='r', linestyle='--')
-plt.axvline(x=120, color='r', linestyle='--', label='Sudden Perturbation')
-plt.axvline(x=160, color='r', linestyle='--')
+
+# Add shaded regions to indicate segments
+plt.axvspan(0, 40, color='grey', alpha=0.2, label='No Perturbation')
+plt.axvspan(40, 80, color='red', alpha=0.2, label='Gradual Perturbation')
+plt.axvspan(80, 120, color='white', alpha=0.2, label='No Perturbation')
+plt.axvspan(120, 160, color='blue', alpha=0.2, label='Sudden Perturbation')
+plt.axvspan(160, 200, color='grey', alpha=0.2, label='Recovery Phase')
+
+
 plt.legend()
 plt.savefig('error_angles.png')
-
 #%%
 sys.exit()
 
