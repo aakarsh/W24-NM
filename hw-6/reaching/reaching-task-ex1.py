@@ -320,7 +320,7 @@ df = pd.DataFrame(error_angles, columns=['Error_Angles'])
 df.to_csv('error_angles.csv', index=False)
 #%%
 error_angles = pd.read_csv('error_angles.csv')
-# Plot the error angles over all attempts and highlight the experiment’s segments
+# Plot the error angles over all attempts and highlight the experiment’s segments.
 #%%
 error_angles_masked = np.ma.masked_invalid(df['Error_Angles'])
 plt.figure(figsize=(15, 9))
@@ -328,6 +328,8 @@ plt.plot(error_angles_masked)
 plt.xlabel('Attempts')
 plt.ylabel('Error Angles')
 plt.title('Error Angles over all attempts')
+
+
 
 # Add shaded regions to indicate segments
 plt.axvspan(0, 40, color='grey', alpha=0.2, label='No Perturbation')
@@ -339,6 +341,12 @@ plt.axvspan(160, 200, color='grey', alpha=0.2, label='Recovery Phase')
 
 plt.legend()
 plt.savefig('error_angles.png')
+
+#%% # What‘s the motor variability (MV) in the unperturbed segements?
+# unberrutbed segments are 
+unpertubed_segments = [(0, 40), (80, 120), (160, 200)]
+for idx, segment in enumerate(unpertubed_segments):
+    print(f"%d. Motor Variability in the unperturbed segment %s is %f" % (idx+1, segment, np.nanstd(error_angles_masked[segment[0]:segment[1]])))
 #%%
 sys.exit()
 
