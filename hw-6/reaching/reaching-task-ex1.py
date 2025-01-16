@@ -121,7 +121,7 @@ def compute_error_angle(start_position, target, circle_pos):
     signed_angle_degrees = np.degrees(signed_angle_radians)
 
     assert np.isclose(angle_degrees, np.abs(signed_angle_degrees)), "The angle in degrees should equal the magnitude of the signed angle."
-    # assuming clock wise error is negative.
+    # assuming clock wise error is positive.
     return signed_angle_degrees 
 
 # Main game loop
@@ -260,8 +260,9 @@ while running:
         text_rect = text.get_rect(center=(START_POSITION))
         screen.blit(text, text_rect)
         # exclude attempt.
-        error_angles.pop()  # Remove the error angle for the current attempt
-        error_angle.append(float("NaN"))  # Add 0 to the error angle list for the current attempt
+        if len(error_angles) >0 :
+            error_angles.pop()  # Remove the error angle for the current attempt
+            error_angles.append(np.nan)  # Add a nan value to indicate the attempt was excluded. 
 
 # Generate playing field
     # Draw current target
@@ -311,8 +312,11 @@ import pandas as pd
 df = pd.DataFrame(error_angles, columns=['Error_Angles'])
 df.to_csv('error_angles.csv', index=False)
 
+error_angles = pd.read_csv('error_angles.csv')
 # Plot the error angles over all attempts and highlight the experiment’s segments
-plt.plot(error_angles)
+error_angles_masked = np.ma.masked_invalid(df['Error_Angles'])
+
+plt.plot(error_angles_masked)
 plt.xlabel('Attempts')
 plt.ylabel('Error Angles')
 plt.title('Error Angles over all attempts')
