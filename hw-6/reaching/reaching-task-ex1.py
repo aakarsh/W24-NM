@@ -232,7 +232,7 @@ while running:
         attempts += 1
 
         # CALCULATE AND SAVE ERRORS between target and circle end position for a miss
-        error_angle = compute_error_angle(START_POSITION, new_target, circle_pos) #float("NaN")
+        error_angle = compute_error_angle(START_POSITION, new_target, circle_pos) 
         error_angles.append(error_angle)
 
         new_target = None  # Set target to None to indicate miss
@@ -259,6 +259,9 @@ while running:
         text = font.render('MOVE FASTER!', True, RED)
         text_rect = text.get_rect(center=(START_POSITION))
         screen.blit(text, text_rect)
+        # exclude attempt.
+        error_angles.pop()  # Remove the error angle for the current attempt
+        error_angle.append(float("NaN"))  # Add 0 to the error angle list for the current attempt
 
 # Generate playing field
     # Draw current target
@@ -303,9 +306,24 @@ while running:
 pygame.quit()
 
 ## TASK 2, CALCULATE, PLOT AND SAVE (e.g. export as .csv) ERRORS from error_angles
+# Save the error computed data to csv file. 
+import pandas as pd
+df = pd.DataFrame(error_angles, columns=['Error_Angles'])
+df.to_csv('error_angles.csv', index=False)
 
-
+# Plot the error angles over all attempts and highlight the experiment’s segments
+plt.plot(error_angles)
+plt.xlabel('Attempts')
+plt.ylabel('Error Angles')
+plt.title('Error Angles over all attempts')
+plt.axvline(x=40, color='r', linestyle='--', label='Gradual Perturbation')
+plt.axvline(x=80, color='r', linestyle='--')
+plt.axvline(x=120, color='r', linestyle='--', label='Sudden Perturbation')
+plt.axvline(x=160, color='r', linestyle='--')
+plt.legend()
+plt.savefig('error_angles.png')
 sys.exit()
+
 '''
 - TASK 1: Implementation of perturbation:
     - Implement a sudden clockwise perturbation of 30°
