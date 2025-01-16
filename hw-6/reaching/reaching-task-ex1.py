@@ -128,6 +128,8 @@ def compute_error_angle(start_position, target, circle_pos):
 # Main game loop
 running = True
 current_step = 0
+cursor_positions = []
+
 while running:
     screen.fill(BLACK)
     current_step += 1
@@ -204,10 +206,16 @@ while running:
             # After we reach 10 steps, we reset the gradual step.
             if gradual_step >= 10: # Reset the gradual_step after 10 steps
                 gradual_step = 0
+                cursor_positions = [] # Reset the cursor positions after 10 steps
                 
             prev_gradual_attempts = gradual_attempts
 
         perturbed_mouse_pos = compute_perturbed_position(START_POSITION, distance, perturbed_mouse_angle)
+
+        cursor_positions.append(perturbed_mouse_pos)
+        for pos in cursor_positions:
+            pygame.draw.circle(screen, GREEN, pos, CIRCLE_SIZE // 4)
+            
         assert len(perturbed_mouse_pos) == 2, "The perturbed_mouse_pos should be a tuple with 2 elements"
         circle_pos = perturbed_mouse_pos
     else:
@@ -218,6 +226,7 @@ while running:
     if check_target_reached():
         score += 1
         attempts += 1
+        cursor_positions = []
 
         # CALCULATE AND SAVE ERRORS between target and circle end position for a hit
         error_angle = compute_error_angle(START_POSITION, new_target, circle_pos) 
@@ -231,7 +240,7 @@ while running:
     #miss if player leaves the target_radius + 1% tolerance
     elif new_target and math.hypot(circle_pos[0] - START_POSITION[0], circle_pos[1] - START_POSITION[1]) > TARGET_RADIUS*1.01:
         attempts += 1
-
+        cursor_positions = []
         # CALCULATE AND SAVE ERRORS between target and circle end position for a miss
         error_angle = compute_error_angle(START_POSITION, new_target, circle_pos) 
         error_angles.append(error_angle)
@@ -247,7 +256,7 @@ while running:
         new_target = generate_target_position()
         move_faster = False
         start_time = pygame.time.get_ticks()  # Start the timer for the attempt
-
+        cursor_positions = []
     # Check if time limit for the attempt is reached
     current_time = pygame.time.get_ticks()
     if start_time != 0 and (current_time - start_time) > TIME_LIMIT:
@@ -269,7 +278,6 @@ while running:
     # Draw current target
     if new_target:
         pygame.draw.circle(screen, BLUE, new_target, TARGET_SIZE // 2)
-
     # Draw circle cursor
     if mask_mode:
         if distance < MASK_RADIUS:
@@ -319,7 +327,7 @@ sns.set_theme(style="whitegrid")
 df = pd.DataFrame(error_angles, columns=['Error_Angles'])
 df.to_csv('error_angles.csv', index=False)
 #%%
-error_angles = pd.read_csv('error_angles.csv')
+df = pd.read_csv('error_angles_10_08.csv')
 # Plot the error angles over all attempts and highlight the experiment’s segments.
 #%%
 error_angles_masked = np.ma.masked_invalid(df['Error_Angles'])
@@ -329,19 +337,16 @@ plt.xlabel('Attempts')
 plt.ylabel('Error Angles')
 plt.title('Error Angles over all attempts')
 
-
-
 # Add shaded regions to indicate segments
 plt.axvspan(0, 40, color='grey', alpha=0.2, label='No Perturbation')
 plt.axvspan(40, 80, color='red', alpha=0.2, label='Gradual Perturbation')
 plt.axvspan(80, 120, color='white', alpha=0.2, label='No Perturbation')
 plt.axvspan(120, 160, color='blue', alpha=0.2, label='Sudden Perturbation')
-plt.axvspan(160, 200, color='grey', alpha=0.2, label='Recovery Phase')
-
+plt.axvspan(160, 200, color='grey', alpha=0.2, label='No Perturbation')
 
 plt.legend()
 plt.savefig('error_angles.png')
-
+plt.show()
 #%% # What‘s the motor variability (MV) in the unperturbed segements?
 # unberrutbed segments are 
 unpertubed_segments = [(0, 40), (80, 120), (160, 200)]
@@ -376,4 +381,34 @@ sys.exit()
 - TASK 4: One sentence on what you did. One sentence why it 
           was interesting to you
 
+
+
+What do you see when perturbation is introduced? 
+
+We see a higher error angle variance when the perturbations 
+are introduced.  The error angles for gradual perturbations are 
+larger than the sudden perturbations. Moreover we see that the 
+the error angles for gradual start out more negative and then correct
+to be closer to zero over time.  
+
+Is there an after effect?
+
+We see that for gradual error there is a higher motor variability  
+introduced after the gradual trail has occurred. This seems to 
+indicate that gradual error leads more persistent after effects 
+than in the sudden trial. 
+
+What is the difference between sudden and gradual perturbation?
+
+The direction of errors for gradual and sudden perturbations 
+are opposite due to the sign of the deviation which are introduced. 
+Gradual errors are harder to compensate for and lead to stronger 
+after effects.
+
+
+Why is it important to mask the last part of the trajectory ?
+
+
+
 '''
+# %%
