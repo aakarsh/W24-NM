@@ -1,10 +1,11 @@
+#%%
 import pygame
 import sys
 import random
 import math
 import numpy as np
 import matplotlib.pyplot as plt
-
+#%%
 # Game parameters
 SCREEN_X, SCREEN_Y = 1789, 1120 # 3840, 2160 # Your screen resolution
 WIDTH, HEIGHT = SCREEN_X // 1.5  , SCREEN_Y // 1.5 # be aware of monitor scaling on windows (150%)
@@ -308,14 +309,19 @@ pygame.quit()
 
 ## TASK 2, CALCULATE, PLOT AND SAVE (e.g. export as .csv) ERRORS from error_angles
 # Save the error computed data to csv file. 
+#%%
+from matplotlib import pyplot as plt
 import pandas as pd
+#%%
 df = pd.DataFrame(error_angles, columns=['Error_Angles'])
 df.to_csv('error_angles.csv', index=False)
 
+#%%
 error_angles = pd.read_csv('error_angles.csv')
 # Plot the error angles over all attempts and highlight the experiment’s segments
 error_angles_masked = np.ma.masked_invalid(df['Error_Angles'])
 
+#%%
 plt.plot(error_angles_masked)
 plt.xlabel('Attempts')
 plt.ylabel('Error Angles')
@@ -326,6 +332,8 @@ plt.axvline(x=120, color='r', linestyle='--', label='Sudden Perturbation')
 plt.axvline(x=160, color='r', linestyle='--')
 plt.legend()
 plt.savefig('error_angles.png')
+
+#%%
 sys.exit()
 
 '''
